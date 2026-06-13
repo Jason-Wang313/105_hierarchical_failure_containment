@@ -1,8 +1,16 @@
-observed_only_wam nominal success=0.532 tail_risk=0.468
-observed_only_wam hidden_mode_shift success=0.168 tail_risk=0.833
-augmentation_as_data_wam nominal success=0.568 tail_risk=0.432
-augmentation_as_data_wam hidden_mode_shift success=0.268 tail_risk=0.732
-scalar_uncertainty_wam nominal success=0.620 tail_risk=0.380
-scalar_uncertainty_wam hidden_mode_shift success=0.357 tail_risk=0.643
-proposed_branch_mechanism nominal success=0.792 tail_risk=0.208
-proposed_branch_mechanism hidden_mode_shift success=0.537 tail_risk=0.463
+Submission-hardening experiment for paper 105 hierarchical_failure_containment
+Seven seeds, 600 episodes per seed, strong baselines, ablations, stress sweep, and negative cases.
+observed_only_behavior_clone hidden_mode_shift mean_success=0.4019 ci95=0.0130 tail=0.5981
+observed_only_behavior_clone combined_stress mean_success=0.3295 ci95=0.0069 tail=0.6705
+data_augmentation_wam hidden_mode_shift mean_success=0.4893 ci95=0.0129 tail=0.5107
+data_augmentation_wam combined_stress mean_success=0.4329 ci95=0.0180 tail=0.5671
+scalar_uncertainty_planner hidden_mode_shift mean_success=0.5479 ci95=0.0169 tail=0.4521
+scalar_uncertainty_planner combined_stress mean_success=0.5041 ci95=0.0157 tail=0.4959
+ensemble_disagreement_planner hidden_mode_shift mean_success=0.5917 ci95=0.0205 tail=0.4083
+ensemble_disagreement_planner combined_stress mean_success=0.5474 ci95=0.0149 tail=0.4526
+conformal_risk_filter hidden_mode_shift mean_success=0.6098 ci95=0.0142 tail=0.3902
+conformal_risk_filter combined_stress mean_success=0.5738 ci95=0.0092 tail=0.4262
+proposed_branch_mechanism hidden_mode_shift mean_success=0.6812 ci95=0.0223 tail=0.3188
+proposed_branch_mechanism combined_stress mean_success=0.6595 ci95=0.0073 tail=0.3405
+oracle_branch_upper_bound hidden_mode_shift mean_success=0.7617 ci95=0.0244 tail=0.2383
+oracle_branch_upper_bound combined_stress mean_success=0.7502 ci95=0.0080 tail=0.2498
