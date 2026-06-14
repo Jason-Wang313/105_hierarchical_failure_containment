@@ -1,0 +1,9 @@
+case_id,task,regime,proposed_success,strongest_baseline,baseline_success,success_gap,proposed_containment,proposed_false_halt,lesson
+1,bimanual_handoff,perception_glitch,0.5935,failure_aware_hierarchical_controller,0.5884,0.0051,0.5425,0.1684,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+2,peg_assembly,actuator_slip,0.5918,failure_aware_hierarchical_controller,0.5612,0.0306,0.5051,0.1497,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+3,drawer_retrieval,subgoal_drift,0.5646,failure_aware_hierarchical_controller,0.5238,0.0408,0.5102,0.1599,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+4,peg_assembly,precondition_drift,0.5697,failure_aware_hierarchical_controller,0.5272,0.0425,0.5646,0.1735,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+5,bimanual_handoff,actuator_slip,0.5969,failure_aware_hierarchical_controller,0.5493,0.0476,0.4881,0.1412,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+6,mobile_manip_delivery,contact_instability,0.5952,failure_aware_hierarchical_controller,0.5476,0.0476,0.5017,0.1837,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+7,peg_assembly,perception_glitch,0.585,failure_aware_hierarchical_controller,0.5374,0.0476,0.5017,0.1956,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk
+8,mobile_manip_delivery,actuator_slip,0.6344,failure_aware_hierarchical_controller,0.5867,0.0476,0.534,0.1701,hierarchical containment helps least when a local retry or option termination can recover before task state is at risk

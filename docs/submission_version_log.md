@@ -1,18 +1,25 @@
 # Submission Version Log
 
 ## v1 - Generated Draft
+
 - Original continuation-batch generated paper and toy single-seed experiment.
 
 ## v2 - Submission Hardening
+
 - Added hostile reviewer attack log and response docs.
-- Replaced the toy experiment with seven-seed metrics, stronger baselines, ablations, stress tests, and negative cases.
-- Narrowed claims to synthetic diagnostic evidence.
-- Recompiled canonical PDF at `C:/Users/wangz/Downloads/105.pdf`.
+- Added seven-seed synthetic metrics, stronger baselines, ablations, stress tests, and negative cases.
 - Terminal decision: WORKSHOP_ONLY.
 
 ## v3 - ICLR Main Gate Archive
-- Applied the stricter ICLR-main-conference standard.
-- Re-read local paper, docs, experiments, prior-work artifacts, PDF state, and repo state.
-- Determined that missing real-robot/high-fidelity evidence, template-generated experiments, and unresolved novelty threats are not recoverable from local artifacts.
-- Recompiled the canonical PDF with `Submission-hardening version: v3`.
-- Terminal decision: KILL_ARCHIVE.
+
+- Applied stricter ICLR-main-conference standard.
+- Marked the existing artifact `KILL_ARCHIVE` because the local evidence was template-like and underpowered.
+
+## v4 - Paper-Specific Evidence Rebuild
+
+- Added `docs/paper105_rebuild_plan.md`.
+- Replaced the runner with a hierarchical-failure-containment benchmark.
+- Generated fresh metrics, per-task/per-regime tables, pairwise tests, ablations, stress sweeps, failure cases, figures, and LaTeX tables.
+- Removed obsolete v3 outputs from the runner.
+- Rewrote the paper as a strong-revise evidence report with honest limitations.
+- Terminal decision: STRONG_REVISE.

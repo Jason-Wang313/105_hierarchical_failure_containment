@@ -2,18 +2,20 @@
 
 Paper: 105 hierarchical_failure_containment
 
-Existing v2 decision: KILL_ARCHIVE
+Previous v3 decision: KILL_ARCHIVE
 
-Gate verdict: KILL_ARCHIVE
+v4 gate verdict: STRONG_REVISE
 
-Evidence digest: 399fec36fb5bddc2
+Evidence digest: 5 tasks x 7 failure regimes x 5 splits x 9 methods x 7 seeds x 84 episodes/group.
 
-Fatal blockers:
-- Synthetic-only evidence.
-- Template-generated experiment and writing.
-- No real robot or high-fidelity benchmark.
-- No trained WAM/model checkpoint.
-- No implemented real baselines.
-- No manual exhaustive related-work synthesis.
+Gate outcomes:
 
-The only honest main-conference-safe decision is to archive rather than overclaim.
+- Success gate: pass. Proposed combined-cascade success exceeds the strongest non-oracle baseline by `0.084`.
+- Diagnostic gate: pass. Containment rate improves by `0.121` over the strongest non-oracle baseline.
+- Safety gate: pass. Damage, state corruption, and false-halt rates are not worse than the strongest non-oracle baseline.
+- Pairwise gate: pass. Proposed beats the strongest non-oracle baseline in `7/7` seeds.
+- Ablation gate: pass. The full model beats the best removed-component ablation by `0.0321`.
+
+Terminal decision: STRONG_REVISE.
+
+Submission status: not ICLR-main-ready until real robot or independent high-fidelity validation is added.
