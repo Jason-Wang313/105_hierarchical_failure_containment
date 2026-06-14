@@ -1,26 +1,23 @@
-        # Hostile Reviewer Response
+# Hostile Reviewer Response
 
-        Paper: 105 Hierarchical Failure Containment
+Paper: 105 Hierarchical Failure Containment
 
-        ## Strongest Technical Threats
-        - H-WM: Robotic Task and Motion Planning Guided by Hierarchical World Model (2026)
-- Grounding Large Language Models for Robot Task Planning Using Closed-Loop State Feedback (2025)
-- Hierarchical Vision-Language Planning for Multi-Step Humanoid Manipulation (2025)
-- Hierarchical Vision Language Action Model Using Success and Failure Demonstrations (2025)
-- FailSafe: Reasoning and Recovery from Failures in Vision-Language-Action Models (2025)
-- State parametrization in optimal control problems and low level controller design for multiple autonomous mobile robot systems (2011)
-- Failure Modes Analysis Related to User Experience in Interactive System Design Through a Fuzzy Failure Mode and Effect Analysis-Based Hybrid Approach (2025)
-- Hierarchical task decomposition for execution monitoring and error recovery: Understanding the rationale behind task demonstrations (2026)
+## Strongest Technical Threats
 
-        ## ICLR Main Response
-        A hostile ICLR reviewer would be correct to reject this as a main-conference submission. The v2 paper has reproducible synthetic evidence and careful limitations, but it does not contain the real robot, high-fidelity simulator, learned model, or manual related-work depth needed for the ICLR main track.
+- Options and option-termination methods already formalize hierarchical control.
+- Option-Critic and HIRO-style methods already learn hierarchical policies.
+- Recovery RL and learned recovery chains already handle failures and safe recovery.
+- Vision-language-action failure-recovery systems already reason about failures in hierarchical task settings.
+- Safety filters and uncertainty halting already reduce damage through conservative intervention.
 
-        ## Honest Action
-        The paper is marked `KILL_ARCHIVE`. This avoids converting a generated workshop-style idea into an overstated main-conference claim.
+## ICLR Main Response
 
-        ## What Would Be Needed To Revive
-        - Real robot or high-fidelity benchmark experiments.
-        - Implemented model and baselines, not synthetic probability tables.
-        - Manual full-paper related-work audit.
-        - Paper-specific writing and figures.
-        - Evidence that the core mechanism is learned and useful under deployment shift.
+The v4 rebuild narrows the novelty boundary to hierarchical containment: stopping or repairing low-level failures before they corrupt higher-level task state. The local benchmark supports that boundary: proposed combined-cascade success is `0.576 +/- 0.007` versus `0.492 +/- 0.006` for the strongest non-oracle baseline, with lower state corruption, cascade, and damage rates.
+
+## Remaining Hostile Review
+
+A hostile reviewer would still be correct to reject a main-track submission today. The evidence is local and synthetic; the baselines are executable diagnostic models rather than external robot systems; and there is no real robot or independently validated high-fidelity simulator evidence.
+
+## Honest Action
+
+The paper is marked `STRONG_REVISE`. Continue only if the next version adds real robot or high-fidelity external validation and implemented learned baselines.

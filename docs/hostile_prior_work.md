@@ -1,17 +1,14 @@
-        # Hostile Prior Work
+# Hostile Prior Work
 
-        The hostile set contains 100 papers. The strongest threats are:
-        - H-WM: Robotic Task and Motion Planning Guided by Hierarchical World Model (2026)
-- Grounding Large Language Models for Robot Task Planning Using Closed‐Loop State Feedback (2025)
-- Hierarchical Vision-Language Planning for Multi-Step Humanoid Manipulation (2025)
-- Hierarchical Vision Language Action Model Using Success and Failure Demonstrations (2025)
-- FailSafe: Reasoning and Recovery from Failures in Vision-Language-Action Models (2025)
-- State parametrization in optimal control problems and low level controller design for multiple autonomous mobile robot systems (2011)
-- Failure Modes Analysis Related to User Experience in Interactive System Design Through a Fuzzy Failure Mode and Effect Analysis-Based Hybrid Approach (2025)
-- Hierarchical task decomposition for execution monitoring and error recovery: Understanding the rationale behind task demonstrations (2026)
-- MetaWorld: Skill Transfer and Composition in a Hierarchical World Model for Grounding High-Level Instructions (2026)
-- RoboMatrix: A Skill-centric Hierarchical Framework for Scalable Robot Task Planning and Execution in Open-World (2024)
-- How task objectivity shapes customer responses to robot service failure (2025)
-- Kinodynamic Task and Motion Planning using VLM-guided and Interleaved Sampling (2025)
+The closest threats are methods that already use hierarchical control, option termination, safety filters, recovery policies, or failure-aware task planning.
 
-        The novelty boundary is not "robotics plus more data" or "add uncertainty." The contribution must show that the mechanism in `hierarchical_failure_containment` changes what the model represents or what the planner can choose.
+- Options formalize temporally extended actions and termination.
+- Option-Critic learns options and termination conditions.
+- HIRO-style methods learn hierarchical policies for long-horizon control.
+- Recovery RL and recovery-chain methods learn policies that recover from unsafe or failed states.
+- Vision-language-action failure recovery systems reason about failures and recovery in task hierarchies.
+- Conservative safety filters and uncertainty halt policies already reduce damage by stopping risky actions.
+
+The v4 novelty boundary is therefore narrow: Paper 105 is not "use a hierarchy" and not "add a safety filter." It must show containment of failures before they corrupt higher-level task state, while avoiding excessive false stops.
+
+Current evidence supports this boundary locally, but real robot or independent high-fidelity validation remains required.
