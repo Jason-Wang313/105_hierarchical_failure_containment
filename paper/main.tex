@@ -5,6 +5,9 @@
 \usepackage{url}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{microtype}
+
+\raggedbottom
 
 \title{Hierarchical Failure Containment for Long-Horizon Robot Policies}
 \author{Anonymous Authors}
@@ -13,7 +16,7 @@
 \maketitle
 
 \begin{abstract}
-Long-horizon robot tasks fail badly when low-level execution errors corrupt higher-level task state: a slipping grasp invalidates an assembly subgoal, a contact instability damages a part, or an exhausted recovery budget turns a local mistake into a task-level cascade. Hierarchical policies and option termination help, but they do not by themselves decide where a failure should be contained. We rebuild Paper 105 around a falsifiable claim: hierarchical robot policies should explicitly model containment boundaries between low-level skill anomalies, mid-level subgoals, and high-level task state. The local benchmark covers 5 robot task families, 7 failure regimes, 5 stress splits, 9 methods, 7 seeds, and 84 episodes per group. On combined cascade stress, the proposed containment graph obtains $0.576 \pm 0.007$ success versus $0.492 \pm 0.006$ for the strongest non-oracle baseline, while improving containment from $0.394$ to $0.515$, reducing state corruption from $0.098$ to $0.053$, and reducing damage from $0.050$ to $0.029$. Pairwise tests favor the proposed method over the strongest baseline in 7/7 seeds, and ablations show that local containment edges, cross-level escalation, recovery-budget memory, corruption prediction, and false-halt calibration each matter. The terminal decision is \textbf{STRONG\_REVISE}: the local evidence supports the mechanism, but the paper is not ICLR-main-ready until validated on real robots or independent high-fidelity benchmarks.
+Long-horizon robot tasks fail badly when low-level execution errors corrupt higher-level task state: a slipping grasp invalidates an assembly subgoal, a contact instability damages a part, or an exhausted recovery budget turns a local mistake into a task-level cascade. Hierarchical policies and option termination help, but they do not by themselves decide where a failure should be contained. We rebuild Paper 105 around a falsifiable claim: hierarchical robot policies should explicitly model containment boundaries between low-level skill anomalies, mid-level subgoals, and high-level task state. The local benchmark covers 5 robot task families, 7 failure regimes, 5 stress splits, 9 methods, 7 seeds, and 84 episodes per group. On combined cascade stress, the proposed containment graph obtains $0.576 \pm 0.007$ success versus $0.492 \pm 0.006$ for the strongest non-oracle baseline, while improving containment from $0.394$ to $0.515$, reducing state corruption from $0.098$ to $0.053$, and reducing damage from $0.050$ to $0.029$. Pairwise tests favor the proposed method over the strongest baseline in 7/7 seeds, and ablations show that local containment edges, cross-level escalation, recovery-budget memory, corruption prediction, and false-halt calibration each matter. A 2026-06-15 continuation audit reran the full benchmark and preserved the terminal decision: \textbf{STRONG\_REVISE}. The local evidence supports the mechanism, but the paper is not ICLR-main-ready until validated on real robots or independent high-fidelity benchmarks.
 \end{abstract}
 
 \section{Motivation}
@@ -56,6 +59,8 @@ The evidence reports task success, containment rate, state corruption, cascade r
 \input{../results/combined_stress_table.tex}
 
 The strongest non-oracle baseline is \texttt{failure\_aware\_hierarchical\_controller}. On combined cascade stress, the proposed method improves success by $0.084 \pm 0.009$, wins 7/7 paired seeds, improves containment by $0.121$, lowers state corruption by $0.045$, and lowers damage by $0.022$. The oracle remains substantially better at $0.734 \pm 0.007$, which shows that the benchmark is not saturated.
+
+At maximum stress level $0.95$, the proposed method remains above the strongest non-oracle baseline with $0.581 \pm 0.008$ success versus $0.471 \pm 0.010$, lower state corruption ($0.055$ versus $0.098$), lower cascade rate ($0.120$ versus $0.169$), lower damage ($0.031$ versus $0.054$), and lower containment latency ($0.808$ versus $0.898$). This is still local evidence rather than external validation.
 
 \begin{figure}[t]
 \centering
@@ -114,7 +119,10 @@ The evidence is strong enough to justify continued work but not submission. The 
 
 The terminal decision for this rebuild is therefore \textbf{STRONG\_REVISE}. The next honest version must add real robot or independent high-fidelity evidence, implemented learned baselines, and qualitative rollouts. Without that evidence, the paper should not be submitted to ICLR main.
 
+\begingroup
+\raggedright
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}
+\endgroup
 
 \end{document}

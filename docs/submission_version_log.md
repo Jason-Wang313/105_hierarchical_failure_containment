@@ -23,3 +23,12 @@
 - Removed obsolete v3 outputs from the runner.
 - Rewrote the paper as a strong-revise evidence report with honest limitations.
 - Terminal decision: STRONG_REVISE.
+
+## v4.1 - Continuation Submission Audit
+
+- Added `docs/paper105_iclr_submission_execution_plan_20260615.md`.
+- Reran `src/run_experiment.py` from source with the full benchmark and logged the run at `logs/105_hierarchical_failure_containment_continuation_rerun_20260615.log`.
+- Verified expected CSV coverage and finite numeric outputs.
+- Reconfirmed the strongest non-oracle baseline as `failure_aware_hierarchical_controller`.
+- Added terminal audit docs and rebuilt the numbered Downloads PDF.
+- Terminal decision: STRONG_REVISE; ICLR main ready: no.
