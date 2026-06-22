@@ -1,0 +1,27 @@
+\begin{table}[t]
+\centering
+\caption{Hard-aggregate hierarchical failure containment results.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Method & Succ. & Contain & Cascade & StateCorr & SubgoalCorr & Damage & Util. \\
+\midrule
+oracle\_containment\_supervisor & 0.915 & 0.704 & 0.018 & 0.002 & 0.003 & 0.003 & 0.919 \\
+risk\_calibrated\_hierarchical\_containment\_v5 & 0.838 & 0.652 & 0.042 & 0.002 & 0.002 & 0.002 & 0.790 \\
+proposed\_hierarchical\_failure\_containment\_graph\_v4 & 0.742 & 0.576 & 0.091 & 0.022 & 0.029 & 0.004 & 0.562 \\
+causal\_event\_graph\_containment & 0.682 & 0.496 & 0.122 & 0.047 & 0.049 & 0.020 & 0.387 \\
+recovery\_budgeted\_controller & 0.668 & 0.459 & 0.133 & 0.064 & 0.071 & 0.024 & 0.333 \\
+hierarchical\_pomdp\_monitor & 0.653 & 0.465 & 0.136 & 0.058 & 0.063 & 0.029 & 0.311 \\
+failure\_aware\_hierarchical\_controller & 0.635 & 0.450 & 0.155 & 0.076 & 0.075 & 0.037 & 0.235 \\
+robust\_mpc\_fallback & 0.628 & 0.440 & 0.165 & 0.078 & 0.091 & 0.045 & 0.202 \\
+anomaly\_transformer\_attribution & 0.621 & 0.453 & 0.156 & 0.073 & 0.081 & 0.038 & 0.210 \\
+option\_termination\_monitor & 0.591 & 0.400 & 0.192 & 0.101 & 0.112 & 0.059 & 0.073 \\
+uncertainty\_halt\_policy & 0.523 & 0.328 & 0.229 & 0.130 & 0.138 & 0.077 & -0.114 \\
+reactive\_retry\_recovery & 0.509 & 0.294 & 0.234 & 0.135 & 0.149 & 0.076 & -0.149 \\
+local\_safety\_filter & 0.489 & 0.306 & 0.244 & 0.160 & 0.166 & 0.093 & -0.235 \\
+hierarchy\_without\_containment & 0.410 & 0.189 & 0.290 & 0.184 & 0.209 & 0.124 & -0.473 \\
+flat\_behavior\_clone & 0.337 & 0.121 & 0.329 & 0.213 & 0.227 & 0.148 & -0.664 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

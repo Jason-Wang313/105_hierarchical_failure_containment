@@ -1,0 +1,24 @@
+\begin{table}[t]
+\centering
+\caption{Strict fixed-risk containment results.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Coverage & Succ. & Contain & Cascade & Damage & Util. \\
+\midrule
+oracle\_containment\_supervisor & 1.0 & 0.915278 & 0.704167 & 0.01875 & 0.001562 & 0.924014 \\
+risk\_calibrated\_hierarchical\_containment\_v5 & 1.0 & 0.838542 & 0.653472 & 0.040104 & 0.002604 & 0.790593 \\
+proposed\_hierarchical\_failure\_containment\_graph\_v4 & 0.957291 & 0.7125 & 0.545139 & 0.089931 & 0.007465 & 0.516888 \\
+causal\_event\_graph\_containment & 0.718576 & 0.481424 & 0.372049 & 0.124826 & 0.017708 & 0.080615 \\
+recovery\_budgeted\_controller & 0.646701 & 0.431424 & 0.315625 & 0.128819 & 0.027951 & -0.026047 \\
+hierarchical\_pomdp\_monitor & 0.593577 & 0.395486 & 0.291493 & 0.13993 & 0.032813 & -0.105571 \\
+robust\_mpc\_fallback & 0.355208 & 0.224479 & 0.167187 & 0.172049 & 0.043229 & -0.452133 \\
+failure\_aware\_hierarchical\_controller & 0.311285 & 0.207118 & 0.147917 & 0.152778 & 0.037674 & -0.456593 \\
+option\_termination\_monitor & 0.052951 & 0.031771 & 0.022396 & 0.187847 & 0.059722 & -0.822215 \\
+uncertainty\_halt\_policy & 0.017535 & 0.010417 & 0.005555 & 0.22066 & 0.078299 & -0.950263 \\
+reactive\_retry\_recovery & 0.0 & 0.0 & 0.0 & 0.236632 & 0.075868 & -0.99331 \\
+local\_safety\_filter & 0.0 & 0.0 & 0.0 & 0.255035 & 0.097396 & -1.045528 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

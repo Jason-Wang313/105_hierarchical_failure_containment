@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\caption{Maximum-stress hierarchical containment results.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Succ. & Contain & Cascade & Damage & Util. \\
+\midrule
+oracle\_containment\_supervisor & 0.895139 & 0.695139 & 0.02118 & 0.000347 & 0.875504 \\
+risk\_calibrated\_hierarchical\_containment\_v5 & 0.823958 & 0.643403 & 0.054861 & 0.001389 & 0.735437 \\
+proposed\_hierarchical\_failure\_containment\_graph\_v4 & 0.720139 & 0.547222 & 0.094097 & 0.007639 & 0.504887 \\
+causal\_event\_graph\_containment & 0.657986 & 0.486111 & 0.140972 & 0.027431 & 0.306149 \\
+hierarchical\_pomdp\_monitor & 0.643055 & 0.466319 & 0.145486 & 0.034722 & 0.242206 \\
+recovery\_budgeted\_controller & 0.634028 & 0.450347 & 0.146181 & 0.034375 & 0.23717 \\
+robust\_mpc\_fallback & 0.609375 & 0.419444 & 0.188194 & 0.046875 & 0.113967 \\
+anomaly\_transformer\_attribution & 0.604514 & 0.434722 & 0.175347 & 0.051042 & 0.119783 \\
+failure\_aware\_hierarchical\_controller & 0.604514 & 0.437847 & 0.184028 & 0.04757 & 0.127089 \\
+option\_termination\_monitor & 0.564583 & 0.374306 & 0.202778 & 0.059028 & -0.00109 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
