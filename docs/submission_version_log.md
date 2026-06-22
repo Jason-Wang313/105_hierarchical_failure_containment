@@ -27,8 +27,19 @@
 ## v4.1 - Continuation Submission Audit
 
 - Added `docs/paper105_iclr_submission_execution_plan_20260615.md`.
-- Reran `src/run_experiment.py` from source with the full benchmark and logged the run at `logs/105_hierarchical_failure_containment_continuation_rerun_20260615.log`.
+- Reran `src/run_experiment.py` from source with the full benchmark.
 - Verified expected CSV coverage and finite numeric outputs.
 - Reconfirmed the strongest non-oracle baseline as `failure_aware_hierarchical_controller`.
 - Added terminal audit docs and rebuilt the numbered Downloads PDF.
+- Terminal decision: STRONG_REVISE; ICLR main ready: no.
+
+## v5-expanded - Hostile-Review Rebuild
+
+- Added `docs/paper105_expanded_submission_plan_20260622.md`.
+- Replaced the runner with a RAM-light streaming v5 benchmark.
+- Expanded evidence to 6 tasks, 8 regimes, 8 splits, 15 methods, 10 seeds, and raw rollout persistence.
+- Added v5 ablations, stress sweep, fixed-risk budgets, negative cases, row-count validation, nonnegative regret audit, and figures.
+- Added `scripts/generate_manuscript.py` and `scripts/validate_submission_artifacts.py`.
+- Generated a 28-page manuscript with bright boxed clickable citations.
+- Validated canonical PDF at `C:/Users/wangz/Downloads/105.pdf`.
 - Terminal decision: STRONG_REVISE; ICLR main ready: no.

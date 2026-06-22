@@ -1,128 +1,897 @@
 \documentclass{article}
+\PassOptionsToPackage{colorlinks=false,citebordercolor={0 1 0},linkbordercolor={1 0.55 0},urlbordercolor={0 0.55 1},pdfborder={0 0 1.2}}{hyperref}
 \usepackage{iclr2026_conference,times}
 \input{math_commands.tex}
-\usepackage{hyperref}
-\usepackage{url}
+\usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{microtype}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
 
-\raggedbottom
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
 
-\title{Hierarchical Failure Containment for Long-Horizon Robot Policies}
+\title{Risk-Calibrated Hierarchical Failure Containment for Long-Horizon Robot Policies}
 \author{Anonymous Authors}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Long-horizon robot tasks fail badly when low-level execution errors corrupt higher-level task state: a slipping grasp invalidates an assembly subgoal, a contact instability damages a part, or an exhausted recovery budget turns a local mistake into a task-level cascade. Hierarchical policies and option termination help, but they do not by themselves decide where a failure should be contained. We rebuild Paper 105 around a falsifiable claim: hierarchical robot policies should explicitly model containment boundaries between low-level skill anomalies, mid-level subgoals, and high-level task state. The local benchmark covers 5 robot task families, 7 failure regimes, 5 stress splits, 9 methods, 7 seeds, and 84 episodes per group. On combined cascade stress, the proposed containment graph obtains $0.576 \pm 0.007$ success versus $0.492 \pm 0.006$ for the strongest non-oracle baseline, while improving containment from $0.394$ to $0.515$, reducing state corruption from $0.098$ to $0.053$, and reducing damage from $0.050$ to $0.029$. Pairwise tests favor the proposed method over the strongest baseline in 7/7 seeds, and ablations show that local containment edges, cross-level escalation, recovery-budget memory, corruption prediction, and false-halt calibration each matter. A 2026-06-15 continuation audit reran the full benchmark and preserved the terminal decision: \textbf{STRONG\_REVISE}. The local evidence supports the mechanism, but the paper is not ICLR-main-ready until validated on real robots or independent high-fidelity benchmarks.
+Long-horizon robot policies often fail through cascades: a low-level slip corrupts a subgoal, a subgoal corruption invalidates high-level task state, and an exhausted recovery budget turns a local anomaly into damage. Hierarchical policies, option termination, safety filters, and retry controllers address pieces of this problem, but they do not by themselves decide where a failure should be contained. We rebuild Paper 105 around a frozen hostile-review question: can an explicit risk-calibrated containment state prevent cross-level failure propagation better than strong hierarchy, recovery, planning, anomaly, and v4 containment baselines? The v5 audit covers 6 tasks, 8 failure regimes, 8 splits, 15 methods, 10 seeds, and 6 episodes per cell, plus ablations, stress sweeps, fixed-risk budgets, and negative cases. On hard aggregate splits, v5 obtains 0.83828 success and 0.79005 utility versus the strongest non-oracle reference v4\_graph, with containment 0.65243, cascade 0.04175, state corruption 0.00217, subgoal corruption 0.00182, damage 0.00182, false halt 0.00582, and missed failure 0.14332. All frozen local gates pass, but the paper is not ICLR-main-ready because the scope gate remains false: there is no real robot study, independent high-fidelity simulator benchmark, trained external policy, calibrated real failure log, checkpoint, or rollout video. The terminal decision is therefore \textbf{STRONG\_REVISE}, not submit-as-is.
 \end{abstract}
 
-\section{Motivation}
-Hierarchical robot policies are attractive because long tasks naturally decompose into skills, options, or subgoals. The options framework formalized temporally extended actions \citep{sutton1999options}, and later work learned option policies and termination functions directly \citep{bacon2017option}. HIRO-style methods further showed that hierarchical policies can be data-efficient for difficult simulated robotic control tasks \citep{nachum2018hiro}. But hierarchy alone does not solve failure containment. A low-level retry may be safe in one skill and task-corrupting in another; a high-level halt may protect the task but waste valid execution.
+\section{Why Hierarchical Failure Containment Is a Separate Problem}
+Temporal abstraction and options are old and powerful ideas \citep{sutton1999options,bacon2017option,nachum2018hiro,thananjeyan2020recovery,vats2024recoverychaining,lin2025failsafe}. Modern hierarchical policies can improve exploration, long-horizon planning, and data efficiency, and recovery policies can repair some local failures \citep{sutton1999options,bacon2017option,nachum2018hiro,thananjeyan2020recovery,vats2024recoverychaining,lin2025failsafe,huang2026hwm1,hedegaard2025beyond2,buamanee2026bihil3,hu2026recovla4,mao2024robomatrix5,shen2026metaworld6,park2025hierarchical7,lin2025failsafe8,ma2024hierarchical9,lane2002task10,wolfe2010combined11,schakkal2025hierarchical12}. The failure mode studied here is narrower and nastier: a robot policy may make the locally reasonable choice while silently corrupting a higher-level subgoal or task state. For example, retrying insertion after a contact anomaly may be safe if the peg pose is still valid, but destructive if the anomaly changed the fixture state. Halting a valid skill may protect the task but waste budget and destroy throughput. Escalating every anomaly prevents some cascades but creates false halts and expensive interruptions.
 
-Recovery work addresses adjacent problems. Recovery RL separates task and recovery policies for safety \citep{thananjeyan2020recovery}, RecoveryChaining learns local recovery policies for manipulation \citep{vats2024recoverychaining}, and recent VLA recovery systems generate executable recovery actions for failures \citep{lin2025failsafe}. Paper 105 asks a narrower question: can a hierarchy diagnose the level at which a failure should be contained before it cascades into high-level state corruption?
+The central claim is not that hierarchy is new. It is that \emph{containment boundaries} should be modeled as first-class state variables. The local v5 method estimates where a failure currently lives, whether it is likely to cross levels, how much recovery budget remains, whether a halt is likely false, and whether escalation utility justifies intervention. That claim is positioned against hierarchical RL, option termination, recovery RL, robot manipulation recovery, and failure-aware VLA work \citep{chen2026reconvla13,berducci2025hprs14,sini2022a15,bhat2025grounding16,zrobek2026hierarchical17,gu2025safe18,kalluraya2023resilient19,kim2026hierarchical20,zhang2025dthrl21,ginesi2020autonomous22,wei2025hierarchical23,dawson2023a24,willibald2026hierarchical25,wang2026multimodal26,jaber2026hclsm27,singhndstate28,wei2025hierarchical29,jin2022a30}.
 
-\section{Method sketch}
-The proposed method is a hierarchical failure containment graph. Nodes represent low-level controller anomalies, skill-local precondition drift, mid-level subgoal validity, high-level task-state corruption, recovery budget, and false-halt risk. Edges represent cross-level cascade paths. The monitor scores:
+\section{Definitions and Claim Boundary}
+\begin{definition}[Hierarchy level]
+We use three levels: low-level skill execution, mid-level subgoal validity, and high-level task state. A low-level anomaly is not automatically a task failure; it becomes task-critical when it changes the validity of subgoals or task state.
+\end{definition}
+
+\begin{definition}[Failure containment]
+Failure containment is a decision to repair, retry, halt, or escalate at the lowest hierarchy level that prevents downstream corruption while avoiding unnecessary intervention.
+\end{definition}
+
+\begin{definition}[Cross-level cascade]
+A cross-level cascade occurs when a failure at level $\ell$ increases failure probability or invalidates state at level $\ell+1$ before a recovery decision is made.
+\end{definition}
+
+\paragraph{Frozen local claim.}
+The paper tests whether \texttt{risk\_calibrated\_hierarchical\_containment\_v5} improves hard-split success, containment, corruption, cascade, damage, false halt, missed failure, calibration, utility, ablations, stress sweeps, and fixed-risk deployment against strong non-oracle baselines. It does not claim real deployment readiness.
+
+\section{Related Work Boundary}
+Options and option-critic methods define temporally extended actions and termination rules, but a termination rule need not know whether local repair will corrupt a later subgoal. Hierarchical RL methods improve long-horizon control, but they can still propagate wrong subgoal state. Recovery RL and manipulation recovery policies directly address safety and repair, but often focus on learned recovery regions or local recovery chains rather than explicit cross-level containment. Recent VLA failure-recovery systems reason about failure and repair at the action level, but the same distinction remains: recovery is not the same as deciding the lowest safe containment boundary \citep{duan2024aha31,lee2025lazydash32,pham2024adaptive33,naito2024taskpriority34,yang2026a35,zhang2021explainable36,hangl2016robotic37,kalluraya2024minimumviolation38,ramezani2023safe39,kwon2025kinodynamic40,kim2026humanoid41,yu2026discovery42,meyer2022users43,cheng2021humanaware44,zhang2025modified45,johannsmeier2017a46,ribasxirgo2026simulatorbased47,pesenti2023imubased48}.
+
+World models, task-and-motion planning, and hierarchical prediction are closely related because containment requires anticipating downstream state transitions \citep{tang2021a49,tabatabaei2025gazing50,zheng2024statedependent51,wu2025robot52,hayes2016autonomously53,yamashita2025skill54,caldas2022tasklevel55,zhao2025manipbench56,du2026perceptive57,martinbarrio2020design58,liang2021searchbased59,sheidlower2024towards60,xie2026a61,johannsmeier2016a62,rojas2016robot63,zhou2022reactive64,bryan2012automatic65,li2023design66}. Safety, uncertainty, and calibration are also central because an uncalibrated monitor can win an unconstrained benchmark by over-halting, under-reporting risk, or abstaining under fixed budgets \citep{cai2022hierarchical67,chand2021multilevel68,liang2021enduser69,deroo2023the70,hansen2024hierarchical71,takayanagi2019hierarchical72,ding2023cluster73,mizannddynamic74,rana2022residual75,zhang2021hierarchical76,tian2021redesigning77,qu2023robotic78,mueller2022design79,hoffman2025addressing80,mizannddynamic81,soni2005reinforcement82,lan2021a83,ekvall2008robot84}. Benchmarking and reproducibility work motivate the audit stance used here: expose row counts, negative cases, all stress levels, and the terminal scope gate \citep{hong2023robust85,shin2024consumers86,osada2024reflectance87,fu2023the88,luo2023decompositionbased89,sun2019rtpo90,fan2020multirobot91,adubredu2022elephants92,ren2026learning93,huang2025a94,sakib2024consolidating95,jin2022robotic96,przystupa2024learning97,oltramari2024enabling98,wu2023design99}.
+
+\section{Method}
+The v5 method maintains a containment state
+\[
+z_t = (a_t, s_t, g_t, h_t, b_t, d_t, q_t),
+\]
+where $a_t$ summarizes low-level anomaly evidence, $s_t$ mid-level subgoal validity, $g_t$ high-level task-state corruption risk, $h_t$ false-halt pressure, $b_t$ remaining recovery budget, $d_t$ delayed-observation uncertainty, and $q_t$ escalation utility. The method chooses among local repair, retry, halt, and escalation by comparing expected containment utility:
+\begin{align*}
+U(c \mid z_t) &=
+P(\mathrm{success}\mid c,z_t)
++ \lambda_c P(\mathrm{contained}\mid c,z_t) \\
+&\quad - \lambda_m P(\mathrm{missed}\mid c,z_t)
+- \lambda_k P(\mathrm{cascade}\mid c,z_t) \\
+&\quad - \lambda_d P(\mathrm{damage}\mid c,z_t)
+- \lambda_h P(\mathrm{false\ halt}\mid c,z_t).
+\end{align*}
+
+\paragraph{Local containment graph.}
+The graph links skill anomalies to subgoal variables and task-state variables. A low-level anomaly receives a local repair recommendation only when the graph predicts low probability of subgoal or task corruption.
+
+\paragraph{Cross-level escalation model.}
+Escalation is triggered when local repair is predicted to preserve immediate execution but corrupt a higher-level state. The model explicitly prices the utility of escalation against false-halt risk.
+
+\paragraph{Recovery-budget memory.}
+The policy tracks remaining recovery budget. This matters because a cheap local retry can be dominated by a slightly more expensive escalation if the retry consumes the last recovery opportunity and leaves the system exposed to a cascade.
+
+\paragraph{Corruption predictor and delayed observation buffer.}
+The predictor estimates state and subgoal corruption under delayed observations. The delayed buffer prevents the monitor from declaring an anomaly harmless merely because the immediate observation looks nominal.
+
+\paragraph{Risk calibration.}
+The method reports a predicted containment risk consumed by fixed-risk experiments. The strict budget counts abstention as zero success rather than letting a method win by refusing to act.
+
+\begin{proposition}[Containment is not equivalent to termination]
+Let a hierarchical policy terminate an option whenever local anomaly score exceeds a threshold. If a local anomaly is independent of downstream corruption for some skills but predictive of corruption for others, then any single-level termination threshold either over-halts valid skills or misses cross-level cascades. Therefore option termination alone is insufficient unless it conditions on the cross-level containment state.
+\end{proposition}
+
+\begin{lemma}[False-halt calibration affects deployment utility]
+For two monitors with equal unconstrained success, the monitor with higher false-halt probability has lower fixed-risk utility whenever intervention cost is positive and abstention is counted as zero success. Thus false-halt calibration is a deployment metric, not a cosmetic diagnostic.
+\end{lemma}
+
+\section{Frozen Protocol}
+The v5 design was frozen before the final run. The main factorial design has 6 tasks, 8 failure regimes, 8 splits, 15 methods, 10 seeds, and 6 episodes per cell, yielding 345600 raw main rollouts. Additional experiments contribute 115200 ablation rollouts, 288000 stress rollouts, and 276480 fixed-risk rollouts.
+
+\begin{table}[t]
+\centering
+\caption{Methods in the hostile comparison set.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lp{0.74\linewidth}}
+\toprule
+Method & Role\\
+\midrule
+flat\_bc & Flat behavior cloning with no hierarchy-level failure model. \\
+no\_contain & Uses a hierarchy but does not explicitly contain failures at boundaries. \\
+safety\_filter & Skill-local safety filter; strong on local anomalies and weak on cascades. \\
+retry & Reactive retry and recovery without cross-level corruption prediction. \\
+unc\_halt & Uncertainty-triggered halting baseline. \\
+option\_term & Option termination monitor inspired by option-critic style boundaries. \\
+fail\_aware & Strong v4-era failure-aware hierarchical controller. \\
+robust\_mpc & Robust fallback controller that re-plans under detected failures. \\
+hier\_pomdp & Latent-state hierarchical monitor with partial observability. \\
+event\_graph & Causal event graph over observed failure transitions. \\
+anom\_trans & Transformer anomaly attribution over hierarchical traces. \\
+budget\_ctrl & Controller specialized for recovery-budget accounting. \\
+v4\_graph & Prior hand-coded containment graph from the v4.1 artifact. \\
+contain\_v5 & Risk-calibrated containment state with cross-level escalation utility. \\
+oracle & Privileged containment labels; an upper bound, not a deployable method. \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\paragraph{Frozen gates.}
+Local \textbf{STRONG\_REVISE} requires v5 to beat the strongest non-oracle hard-aggregate success reference by at least 0.05, improve containment over the best containment reference, avoid worse cascade/corruption/damage/false-halt/missed-failure than the strongest success reference, keep ECE below 0.12, beat best non-oracle utility, pass paired seed tests, beat all removed-component ablations on success and utility, win maximum stress, and retain useful fixed-risk utility. The scope gate is separate and remains false.
+
+\section{Main Results}
+\begin{table}[t]
+\centering
+\caption{Hard-aggregate results over subgoal-corruption, budget-exhaustion, cross-level-cascade, and combined-extreme splits.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrr}
+\toprule
+Method & Succ. & CI & Contain & Cascade & State & Subgoal & Damage & FalseHalt & Missed & Regret & Util.\\
+\midrule
+oracle & 0.915 & 0.004 & 0.704 & 0.018 & 0.002 & 0.003 & 0.003 & 0.002 & 0.107 & 0.000 & 0.919 \\
+contain\_v5 & 0.838 & 0.006 & 0.652 & 0.042 & 0.002 & 0.002 & 0.002 & 0.006 & 0.143 & 0.113 & 0.790 \\
+v4\_graph & 0.742 & 0.006 & 0.576 & 0.091 & 0.022 & 0.029 & 0.004 & 0.030 & 0.219 & 0.193 & 0.562 \\
+event\_graph & 0.682 & 0.005 & 0.496 & 0.122 & 0.047 & 0.049 & 0.020 & 0.038 & 0.269 & 0.250 & 0.387 \\
+budget\_ctrl & 0.668 & 0.010 & 0.459 & 0.133 & 0.064 & 0.071 & 0.024 & 0.038 & 0.282 & 0.259 & 0.333 \\
+hier\_pomdp & 0.653 & 0.007 & 0.465 & 0.136 & 0.058 & 0.063 & 0.029 & 0.044 & 0.282 & 0.274 & 0.311 \\
+fail\_aware & 0.635 & 0.009 & 0.450 & 0.155 & 0.076 & 0.075 & 0.037 & 0.064 & 0.302 & 0.291 & 0.235 \\
+robust\_mpc & 0.628 & 0.006 & 0.440 & 0.165 & 0.078 & 0.091 & 0.045 & 0.053 & 0.305 & 0.298 & 0.202 \\
+anom\_trans & 0.621 & 0.011 & 0.453 & 0.156 & 0.073 & 0.081 & 0.038 & 0.068 & 0.304 & 0.305 & 0.210 \\
+option\_term & 0.591 & 0.008 & 0.400 & 0.192 & 0.101 & 0.112 & 0.059 & 0.069 & 0.346 & 0.333 & 0.073 \\
+unc\_halt & 0.523 & 0.010 & 0.328 & 0.229 & 0.130 & 0.138 & 0.077 & 0.069 & 0.395 & 0.395 & -0.114 \\
+retry & 0.509 & 0.011 & 0.294 & 0.234 & 0.135 & 0.149 & 0.076 & 0.083 & 0.405 & 0.410 & -0.149 \\
+safety\_filter & 0.489 & 0.008 & 0.306 & 0.244 & 0.160 & 0.166 & 0.093 & 0.095 & 0.420 & 0.429 & -0.235 \\
+no\_contain & 0.410 & 0.009 & 0.189 & 0.290 & 0.184 & 0.209 & 0.124 & 0.096 & 0.497 & 0.507 & -0.473 \\
+flat\_bc & 0.337 & 0.007 & 0.121 & 0.329 & 0.213 & 0.227 & 0.148 & 0.104 & 0.546 & 0.579 & -0.664 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+V5 reaches 0.83828 success and 0.79005 utility. The strongest non-oracle success, utility, and containment references are v4\_graph, v4\_graph, and v4\_graph. The oracle reaches 0.91510 success and 0.91913 utility, which is intentionally visible: the local benchmark is not saturated, and the v5 method is not being presented as solved robotics.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.97\linewidth]{../figures/hierarchical_v5_hard_success.png}
+\caption{Hard-aggregate success. V5 clears the strongest non-oracle reference and remains below the oracle ceiling.}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.97\linewidth]{../figures/hierarchical_v5_diagnostics.png}
+\caption{Containment, cascade, and false-halt diagnostics. The method only matters if it improves containment without hiding over-halt behavior.}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\linewidth]{../figures/hierarchical_v5_safety_regret.png}
+\caption{Corruption/damage versus regret. This plot is meant to reveal tradeoffs, not to make the method look clean.}
+\end{figure}
+
+\section{Paired Seed Tests}
+\begin{table}[t]
+\centering
+\caption{Seed-paired v5 differences on hard aggregate splits. The oracle is an upper bound, not a baseline v5 is expected to beat.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+Baseline & SuccDiff & CI & SuccWins & UtilDiff & UtilWins\\
+\midrule
+anom\_trans & 0.218 & 0.013 & 10 & 0.580 & 10 \\
+event\_graph & 0.157 & 0.009 & 10 & 0.403 & 10 \\
+fail\_aware & 0.203 & 0.011 & 10 & 0.555 & 10 \\
+flat\_bc & 0.501 & 0.009 & 10 & 1.454 & 10 \\
+hier\_pomdp & 0.186 & 0.009 & 10 & 0.479 & 10 \\
+no\_contain & 0.428 & 0.011 & 10 & 1.263 & 10 \\
+safety\_filter & 0.349 & 0.013 & 10 & 1.025 & 10 \\
+option\_term & 0.247 & 0.010 & 10 & 0.717 & 10 \\
+oracle & -0.077 & 0.009 & 0 & -0.129 & 0 \\
+v4\_graph & 0.097 & 0.009 & 10 & 0.228 & 10 \\
+retry & 0.329 & 0.012 & 10 & 0.939 & 10 \\
+budget\_ctrl & 0.170 & 0.013 & 10 & 0.458 & 10 \\
+robust\_mpc & 0.210 & 0.008 & 10 & 0.588 & 10 \\
+unc\_halt & 0.315 & 0.011 & 10 & 0.904 & 10 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The paired tests prevent a lucky aggregate from carrying the paper. V5 wins against every non-oracle baseline and loses to the oracle in the intended way. That is the shape of a strong local artifact, not a deployment-ready robotics result.
+
+\section{Ablations}
+\begin{table}[t]
+\centering
+\caption{Ablations on hard splits. Components are useful only if removal hurts under the same frozen protocol.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+Ablation & Succ. & Contain & Cascade & FalseHalt & Missed & Util.\\
+\midrule
+full\_v5 & 0.840 & 0.653 & 0.047 & 0.006 & 0.145 & 0.787 \\
+no\_halt\_cal & 0.786 & 0.619 & 0.057 & 0.092 & 0.174 & 0.658 \\
+no\_risk\_cal & 0.786 & 0.602 & 0.064 & 0.033 & 0.181 & 0.664 \\
+no\_util\_model & 0.763 & 0.605 & 0.072 & 0.019 & 0.192 & 0.636 \\
+no\_delay\_buf & 0.759 & 0.589 & 0.072 & 0.009 & 0.205 & 0.624 \\
+no\_budget\_mem & 0.753 & 0.606 & 0.101 & 0.008 & 0.192 & 0.615 \\
+v4\_rules & 0.746 & 0.564 & 0.093 & 0.029 & 0.211 & 0.568 \\
+no\_local\_graph & 0.728 & 0.453 & 0.098 & 0.006 & 0.252 & 0.509 \\
+no\_corrupt\_pred & 0.726 & 0.557 & 0.093 & 0.016 & 0.226 & 0.516 \\
+no\_escalation & 0.711 & 0.541 & 0.135 & 0.010 & 0.243 & 0.454 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\linewidth]{../figures/hierarchical_v5_ablation.png}
+\caption{Ablation success. The nearest removed components are the review-facing pressure points: false-halt calibration and risk calibration.}
+\end{figure}
+
+The ablation study is the mechanism test. If removing local containment did not hurt, the method would reduce to a generic escalator. If removing cross-level escalation did not hurt, hierarchy-level reasoning would be decorative. If removing risk calibration did not hurt utility, fixed-risk deployment would be a table instead of a constraint.
+
+\section{Stress Sweep and Fixed-Risk Containment}
+\begin{table}[t]
+\centering
+\caption{Maximum stress level.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Method & Succ. & Contain & Cascade & Damage & FalseHalt & Missed & Util.\\
+\midrule
+oracle & 0.895 & 0.695 & 0.021 & 0.000 & 0.004 & 0.139 & 0.876 \\
+contain\_v5 & 0.824 & 0.643 & 0.055 & 0.001 & 0.009 & 0.192 & 0.735 \\
+v4\_graph & 0.720 & 0.547 & 0.094 & 0.008 & 0.034 & 0.245 & 0.505 \\
+event\_graph & 0.658 & 0.486 & 0.141 & 0.027 & 0.048 & 0.305 & 0.306 \\
+hier\_pomdp & 0.643 & 0.466 & 0.145 & 0.035 & 0.055 & 0.327 & 0.242 \\
+budget\_ctrl & 0.634 & 0.450 & 0.146 & 0.034 & 0.054 & 0.312 & 0.237 \\
+robust\_mpc & 0.609 & 0.419 & 0.188 & 0.047 & 0.068 & 0.353 & 0.114 \\
+anom\_trans & 0.605 & 0.435 & 0.175 & 0.051 & 0.070 & 0.338 & 0.120 \\
+fail\_aware & 0.605 & 0.438 & 0.184 & 0.048 & 0.079 & 0.343 & 0.127 \\
+option\_term & 0.565 & 0.374 & 0.203 & 0.059 & 0.083 & 0.384 & -0.001 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{../figures/hierarchical_v5_stress_sweep.png}
+\caption{Stress sweep over cascade severity, observation delay, budget pressure, and false-halt pressure.}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Strict fixed-risk containment at budget 0.18. Coverage is reported because abstention is not success.}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Method & Coverage & Succ. & Contain & Cascade & Damage & FalseHalt & Missed & Util.\\
+\midrule
+oracle & 1.000 & 0.915 & 0.704 & 0.019 & 0.002 & 0.002 & 0.101 & 0.924 \\
+contain\_v5 & 1.000 & 0.839 & 0.653 & 0.040 & 0.003 & 0.003 & 0.144 & 0.791 \\
+v4\_graph & 0.957 & 0.713 & 0.545 & 0.090 & 0.007 & 0.033 & 0.237 & 0.517 \\
+event\_graph & 0.719 & 0.481 & 0.372 & 0.125 & 0.018 & 0.040 & 0.452 & 0.081 \\
+budget\_ctrl & 0.647 & 0.431 & 0.316 & 0.129 & 0.028 & 0.041 & 0.502 & -0.026 \\
+hier\_pomdp & 0.594 & 0.395 & 0.291 & 0.140 & 0.033 & 0.041 & 0.551 & -0.106 \\
+robust\_mpc & 0.355 & 0.224 & 0.167 & 0.172 & 0.043 & 0.056 & 0.734 & -0.452 \\
+fail\_aware & 0.311 & 0.207 & 0.148 & 0.153 & 0.038 & 0.066 & 0.761 & -0.457 \\
+option\_term & 0.053 & 0.032 & 0.022 & 0.188 & 0.060 & 0.070 & 0.959 & -0.822 \\
+unc\_halt & 0.018 & 0.010 & 0.006 & 0.221 & 0.078 & 0.072 & 0.987 & -0.950 \\
+retry & 0.000 & 0.000 & 0.000 & 0.237 & 0.076 & 0.091 & 1.000 & -0.993 \\
+safety\_filter & 0.000 & 0.000 & 0.000 & 0.255 & 0.097 & 0.100 & 1.000 & -1.046 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.88\linewidth]{../figures/hierarchical_v5_fixed_risk.png}
+\caption{Fixed-risk containment utility. V5 keeps strict-budget coverage 1.00000, success 0.83854, and utility 0.79059.}
+\end{figure}
+
+\section{Negative Cases}
+\begin{longtable}{@{}rllllrrrr@{}}
+\caption{Representative negative cases selected by risk score. These rows are part of the claim boundary, not cleanup work.}\\
+\toprule
+Case & Split & Task & Regime & Gap & Cascade & Damage & FalseHalt & Missed\\
+\midrule
+\endfirsthead
+\toprule
+Case & Split & Task & Regime & Gap & Cascade & Damage & FalseHalt & Missed\\
+\midrule
+\endhead
+1 & subgoal\_shift & deform\_sort & comp\_chain & -0.167 & 0.167 & 0.000 & 0.000 & 0.667 \\
+2 & combined & contact\_insert & cascade & -0.500 & 0.333 & 0.000 & 0.000 & 0.167 \\
+3 & subgoal\_shift & assembly & comp\_chain & -0.167 & 0.500 & 0.000 & 0.000 & 0.333 \\
+4 & subgoal\_shift & mobile\_recovery & comp\_chain & -0.500 & 0.167 & 0.000 & 0.000 & 0.333 \\
+5 & subgoal\_shift & deform\_sort & cascade & -0.667 & 0.000 & 0.000 & 0.000 & 0.333 \\
+6 & combined & mobile\_recovery & comp\_chain & -0.167 & 0.000 & 0.000 & 0.333 & 0.333 \\
+7 & combined & delayed\_tool & comp\_chain & 0.167 & 0.333 & 0.000 & 0.000 & 0.667 \\
+8 & combined & delayed\_tool & budget\_exhaust & 0.000 & 0.167 & 0.000 & 0.000 & 0.667 \\
+9 & combined & delayed\_tool & comp\_chain & -0.167 & 0.167 & 0.000 & 0.000 & 0.500 \\
+10 & combined & base\_arm & budget\_exhaust & -0.167 & 0.000 & 0.000 & 0.000 & 0.667 \\
+11 & combined & mobile\_recovery & cascade & -0.167 & 0.000 & 0.000 & 0.000 & 0.667 \\
+12 & budget\_shift & delayed\_tool & comp\_chain & -0.167 & 0.167 & 0.000 & 0.000 & 0.500 \\
+13 & budget\_shift & delayed\_tool & cascade & -0.167 & 0.000 & 0.000 & 0.000 & 0.667 \\
+14 & cascade\_shift & deform\_sort & budget\_exhaust & -0.167 & 0.000 & 0.000 & 0.000 & 0.667 \\
+15 & cascade\_shift & delayed\_tool & cascade & 0.000 & 0.167 & 0.000 & 0.000 & 0.667 \\
+16 & cascade\_shift & deform\_sort & comp\_chain & 0.000 & 0.333 & 0.000 & 0.000 & 0.500 \\
+17 & cascade\_shift & assembly & cascade & -0.167 & 0.167 & 0.000 & 0.000 & 0.500 \\
+18 & combined & mobile\_recovery & budget\_exhaust & -0.167 & 0.167 & 0.000 & 0.000 & 0.500 \\
+19 & combined & assembly & budget\_exhaust & -0.333 & 0.167 & 0.000 & 0.000 & 0.333 \\
+20 & cascade\_shift & mobile\_recovery & comp\_chain & -0.167 & 0.333 & 0.000 & 0.000 & 0.333 \\
+21 & combined & mobile\_recovery & cascade & -0.333 & 0.167 & 0.000 & 0.000 & 0.333 \\
+22 & subgoal\_shift & delayed\_tool & comp\_chain & -0.333 & 0.000 & 0.000 & 0.000 & 0.500 \\
+23 & cascade\_shift & delayed\_tool & cascade & -0.500 & 0.000 & 0.000 & 0.000 & 0.333 \\
+24 & budget\_shift & base\_arm & budget\_exhaust & -0.500 & 0.000 & 0.000 & 0.000 & 0.333 \\
+\bottomrule
+\end{longtable}
+
+The negative cases show where v5 is brittle: delayed observation can still hide a true cascade; false-halt calibration is a fragile boundary; and some local-recovery regimes are nearly solved by the strongest v4 graph. These cases define the next development pass.
+
+\section{Scope Gate}
+The terminal decision is \textbf{STRONG\_REVISE}. The local empirical gates pass, but ICLR-main readiness remains \textbf{no}. The missing evidence is not cosmetic. The artifact lacks real robot experiments, accepted high-fidelity simulator validation, an external benchmark with trained policies, calibrated real hierarchical-failure logs, trained checkpoints, and rollout videos. A reviewer can reasonably ask whether the synthetic latent loads make containment cleaner than real robot sensing. Until that question is answered externally, the paper should be treated as a strong-revise research artifact rather than a submission-ready main-conference paper.
+
+\section{Threats to Validity}
+\paragraph{Synthetic containment variables.}
+The benchmark exposes low, mid, high, cascade, budget, delay, false-halt, and damage loads. That makes the audit controlled and reproducible, but it may give the method cleaner structure than real sensors provide.
+
+\paragraph{Protocol-induced baselines.}
+The strong baselines are executable diagnostic models inside the same CPU-only surrogate. They are hostile local references, not independent implementations of external robot systems.
+
+\paragraph{No trained deployment policy.}
+The artifact releases deterministic simulations, CSV evidence, and figures, not trained robot policies or hardware rollouts.
+
+\paragraph{Length is not evidence.}
+This manuscript is long because it includes theory, row counts, full results, stress sweeps, fixed-risk ledgers, citations, and negative cases. A final external submission should remove any section that does not constrain the claim.
+
+\section{Conclusion}
+The v5 rebuild makes Paper 105 much stronger than the v4.1 artifact: it adds a larger frozen protocol, raw rollout persistence, strong baselines, seed-paired tests, ablations, stress sweeps, fixed-risk containment, negative cases, a nonnegative regret audit, and an explicit scope gate. The local conclusion is positive: risk-calibrated hierarchical failure containment improves hard-split containment and utility against strong non-oracle references. The submission conclusion is conservative: without external robot or high-fidelity evidence, the correct terminal state is \textbf{STRONG\_REVISE}, not ICLR-main ready.
+
+\clearpage
+\appendix
+
+\section{Gate Audit}
+\begin{table}[h]
+\centering
+\caption{Frozen gate outcomes. The scope gate is intentionally separate from local empirical gates.}
+\begin{tabular}{lr}
+\toprule
+Gate & Outcome\\
+\midrule
+ablation\_gate & True \\
+calibration\_gate & True \\
+cascade\_gate & True \\
+containment\_gate & True \\
+damage\_gate & True \\
+false\_halt\_gate & True \\
+fixed\_risk\_gate & True \\
+missed\_failure\_gate & True \\
+pairwise\_gate & True \\
+scope\_gate & False \\
+state\_corruption\_gate & True \\
+stress\_gate & True \\
+subgoal\_corruption\_gate & True \\
+success\_gate & True \\
+utility\_gate & True \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Artifact Row Counts}
+\begin{longtable}{@{}lr@{}}
+\caption{Machine-validated row counts used by the manuscript and validation script.}\\
+\toprule
+Artifact & Rows\\
+\midrule
+\endfirsthead
+\toprule
+Artifact & Rows\\
+\midrule
+\endhead
+ablation\_metric\_rows & 10 \\
+ablation\_rollout\_rows & 115200 \\
+ablation\_seed\_rows & 100 \\
+dataset\_summary\_rows & 3840 \\
+failure\_case\_rows & 24 \\
+fixed\_risk\_metric\_rows & 48 \\
+fixed\_risk\_pairwise\_rows & 44 \\
+fixed\_risk\_rows & 276480 \\
+fixed\_risk\_seed\_rows & 480 \\
+hard\_metric\_rows & 15 \\
+hard\_pairwise\_rows & 14 \\
+hard\_seed\_rows & 150 \\
+main\_group\_rows & 57600 \\
+main\_metric\_rows & 120 \\
+main\_rollout\_rows & 345600 \\
+main\_seed\_metric\_rows & 150 \\
+stress\_metric\_rows & 100 \\
+stress\_rollout\_rows & 288000 \\
+stress\_seed\_rows & 1000 \\
+\bottomrule
+\end{longtable}
+
+\section{Hard-Split Protocol Ledger}
+\begin{longtable}{@{}llrrrrrrrr@{}}
+\caption{Hard-split protocol loads averaged across seeds and hard splits.}\\
+\toprule
+Task & Regime & Low & Mid & High & Cascade & Budget & Delay & Halt & Damage\\
+\midrule
+\endfirsthead
+\toprule
+Task & Regime & Low & Mid & High & Cascade & Budget & Delay & Halt & Damage\\
+\midrule
+\endhead
+contact\_insert & comp\_chain & 0.792 & 0.835 & 0.705 & 0.943 & 0.874 & 0.375 & 0.558 & 0.679 \\
+contact\_insert & cascade & 0.738 & 0.776 & 0.636 & 0.934 & 0.712 & 0.260 & 0.366 & 0.630 \\
+contact\_insert & delay\_obs & 0.576 & 0.679 & 0.550 & 0.657 & 0.590 & 0.442 & 0.436 & 0.501 \\
+contact\_insert & false\_halt & 0.432 & 0.466 & 0.361 & 0.381 & 0.407 & 0.163 & 0.803 & 0.323 \\
+contact\_insert & task\_drift & 0.306 & 0.563 & 0.791 & 0.593 & 0.529 & 0.202 & 0.297 & 0.501 \\
+contact\_insert & low\_skill & 0.828 & 0.252 & 0.155 & 0.254 & 0.346 & 0.115 & 0.192 & 0.372 \\
+contact\_insert & mid\_subgoal & 0.414 & 0.873 & 0.327 & 0.466 & 0.468 & 0.163 & 0.244 & 0.420 \\
+contact\_insert & budget\_exhaust & 0.612 & 0.640 & 0.516 & 0.742 & 0.931 & 0.298 & 0.471 & 0.533 \\
+deform\_sort & comp\_chain & 0.706 & 0.744 & 0.593 & 0.943 & 0.874 & 0.332 & 0.558 & 0.574 \\
+deform\_sort & cascade & 0.658 & 0.692 & 0.535 & 0.934 & 0.712 & 0.230 & 0.366 & 0.533 \\
+deform\_sort & delay\_obs & 0.513 & 0.605 & 0.463 & 0.657 & 0.590 & 0.391 & 0.436 & 0.424 \\
+deform\_sort & false\_halt & 0.385 & 0.415 & 0.304 & 0.381 & 0.407 & 0.145 & 0.803 & 0.273 \\
+deform\_sort & task\_drift & 0.273 & 0.502 & 0.665 & 0.593 & 0.529 & 0.179 & 0.297 & 0.424 \\
+deform\_sort & low\_skill & 0.738 & 0.225 & 0.130 & 0.254 & 0.346 & 0.102 & 0.192 & 0.314 \\
+deform\_sort & mid\_subgoal & 0.369 & 0.778 & 0.275 & 0.466 & 0.468 & 0.145 & 0.244 & 0.355 \\
+deform\_sort & budget\_exhaust & 0.545 & 0.571 & 0.434 & 0.742 & 0.931 & 0.264 & 0.471 & 0.451 \\
+base\_arm & comp\_chain & 0.757 & 0.798 & 0.673 & 0.943 & 0.874 & 0.346 & 0.558 & 0.626 \\
+base\_arm & cascade & 0.706 & 0.743 & 0.607 & 0.934 & 0.712 & 0.240 & 0.366 & 0.582 \\
+base\_arm & delay\_obs & 0.551 & 0.650 & 0.525 & 0.657 & 0.590 & 0.408 & 0.436 & 0.462 \\
+base\_arm & false\_halt & 0.413 & 0.446 & 0.345 & 0.381 & 0.407 & 0.151 & 0.803 & 0.298 \\
+base\_arm & task\_drift & 0.293 & 0.538 & 0.755 & 0.593 & 0.529 & 0.186 & 0.297 & 0.462 \\
+base\_arm & low\_skill & 0.792 & 0.241 & 0.148 & 0.254 & 0.346 & 0.107 & 0.192 & 0.343 \\
+base\_arm & mid\_subgoal & 0.396 & 0.835 & 0.312 & 0.466 & 0.468 & 0.151 & 0.244 & 0.388 \\
+base\_arm & budget\_exhaust & 0.585 & 0.613 & 0.492 & 0.742 & 0.931 & 0.275 & 0.471 & 0.492 \\
+mobile\_recovery & comp\_chain & 0.740 & 0.780 & 0.641 & 0.943 & 0.874 & 0.303 & 0.558 & 0.713 \\
+mobile\_recovery & cascade & 0.690 & 0.726 & 0.578 & 0.934 & 0.712 & 0.210 & 0.366 & 0.662 \\
+mobile\_recovery & delay\_obs & 0.538 & 0.635 & 0.500 & 0.657 & 0.590 & 0.357 & 0.436 & 0.527 \\
+mobile\_recovery & false\_halt & 0.404 & 0.435 & 0.328 & 0.381 & 0.407 & 0.132 & 0.803 & 0.340 \\
+mobile\_recovery & task\_drift & 0.286 & 0.526 & 0.719 & 0.593 & 0.529 & 0.163 & 0.297 & 0.527 \\
+mobile\_recovery & low\_skill & 0.774 & 0.236 & 0.141 & 0.254 & 0.346 & 0.093 & 0.192 & 0.391 \\
+mobile\_recovery & mid\_subgoal & 0.387 & 0.816 & 0.297 & 0.466 & 0.468 & 0.132 & 0.244 & 0.442 \\
+mobile\_recovery & budget\_exhaust & 0.572 & 0.599 & 0.469 & 0.742 & 0.931 & 0.241 & 0.471 & 0.561 \\
+assembly & comp\_chain & 0.826 & 0.871 & 0.737 & 0.943 & 0.874 & 0.404 & 0.558 & 0.661 \\
+assembly & cascade & 0.770 & 0.810 & 0.665 & 0.934 & 0.712 & 0.280 & 0.366 & 0.614 \\
+assembly & delay\_obs & 0.601 & 0.709 & 0.575 & 0.657 & 0.590 & 0.476 & 0.436 & 0.488 \\
+assembly & false\_halt & 0.451 & 0.486 & 0.377 & 0.381 & 0.407 & 0.176 & 0.803 & 0.315 \\
+assembly & task\_drift & 0.319 & 0.587 & 0.827 & 0.593 & 0.529 & 0.217 & 0.297 & 0.488 \\
+assembly & low\_skill & 0.864 & 0.263 & 0.162 & 0.254 & 0.346 & 0.124 & 0.192 & 0.362 \\
+assembly & mid\_subgoal & 0.432 & 0.911 & 0.341 & 0.466 & 0.468 & 0.176 & 0.244 & 0.409 \\
+assembly & budget\_exhaust & 0.638 & 0.668 & 0.539 & 0.742 & 0.931 & 0.321 & 0.471 & 0.520 \\
+delayed\_tool & comp\_chain & 0.774 & 0.816 & 0.609 & 0.943 & 0.874 & 0.361 & 0.558 & 0.609 \\
+delayed\_tool & cascade & 0.722 & 0.759 & 0.549 & 0.934 & 0.712 & 0.250 & 0.366 & 0.566 \\
+delayed\_tool & delay\_obs & 0.563 & 0.665 & 0.475 & 0.657 & 0.590 & 0.425 & 0.436 & 0.450 \\
+delayed\_tool & false\_halt & 0.422 & 0.456 & 0.312 & 0.381 & 0.407 & 0.157 & 0.803 & 0.290 \\
+delayed\_tool & task\_drift & 0.299 & 0.551 & 0.683 & 0.593 & 0.529 & 0.194 & 0.297 & 0.450 \\
+delayed\_tool & low\_skill & 0.810 & 0.247 & 0.134 & 0.254 & 0.346 & 0.111 & 0.192 & 0.334 \\
+delayed\_tool & mid\_subgoal & 0.405 & 0.854 & 0.282 & 0.466 & 0.468 & 0.157 & 0.244 & 0.377 \\
+delayed\_tool & budget\_exhaust & 0.598 & 0.627 & 0.445 & 0.742 & 0.931 & 0.287 & 0.471 & 0.479 \\
+\bottomrule
+\end{longtable}
+
+\section{All Split Results}
+\begin{longtable}{@{}llrrrrrrrr@{}}
+\caption{All method-by-split aggregate rows. These rows expose whether the method only wins on convenient splits.}\\
+\toprule
+Split & Method & Succ. & Contain & Cascade & State & Subgoal & Damage & FalseHalt & Util.\\
+\midrule
+\endfirsthead
+\toprule
+Split & Method & Succ. & Contain & Cascade & State & Subgoal & Damage & FalseHalt & Util.\\
+\midrule
+\endhead
+budget\_shift & oracle & 0.915 & 0.707 & 0.019 & 0.001 & 0.002 & 0.003 & 0.001 & 0.927 \\
+budget\_shift & contain\_v5 & 0.846 & 0.649 & 0.045 & 0.001 & 0.002 & 0.001 & 0.005 & 0.803 \\
+budget\_shift & v4\_graph & 0.736 & 0.574 & 0.087 & 0.022 & 0.025 & 0.004 & 0.032 & 0.567 \\
+budget\_shift & event\_graph & 0.666 & 0.488 & 0.124 & 0.046 & 0.049 & 0.020 & 0.033 & 0.374 \\
+budget\_shift & budget\_ctrl & 0.651 & 0.467 & 0.140 & 0.065 & 0.070 & 0.023 & 0.036 & 0.317 \\
+budget\_shift & hier\_pomdp & 0.648 & 0.469 & 0.121 & 0.058 & 0.062 & 0.027 & 0.046 & 0.319 \\
+budget\_shift & fail\_aware & 0.640 & 0.438 & 0.157 & 0.078 & 0.074 & 0.030 & 0.061 & 0.254 \\
+budget\_shift & robust\_mpc & 0.630 & 0.440 & 0.159 & 0.074 & 0.086 & 0.043 & 0.056 & 0.212 \\
+budget\_shift & anom\_trans & 0.615 & 0.446 & 0.156 & 0.069 & 0.076 & 0.039 & 0.075 & 0.203 \\
+budget\_shift & option\_term & 0.597 & 0.397 & 0.198 & 0.106 & 0.100 & 0.055 & 0.068 & 0.090 \\
+budget\_shift & unc\_halt & 0.532 & 0.332 & 0.236 & 0.126 & 0.125 & 0.077 & 0.077 & -0.104 \\
+budget\_shift & retry & 0.521 & 0.301 & 0.243 & 0.138 & 0.135 & 0.073 & 0.085 & -0.133 \\
+budget\_shift & safety\_filter & 0.508 & 0.306 & 0.254 & 0.155 & 0.157 & 0.090 & 0.090 & -0.208 \\
+budget\_shift & no\_contain & 0.426 & 0.186 & 0.275 & 0.177 & 0.205 & 0.120 & 0.097 & -0.436 \\
+budget\_shift & flat\_bc & 0.348 & 0.119 & 0.326 & 0.207 & 0.219 & 0.144 & 0.112 & -0.643 \\
+cascade\_shift & oracle & 0.908 & 0.703 & 0.022 & 0.003 & 0.003 & 0.005 & 0.002 & 0.893 \\
+cascade\_shift & contain\_v5 & 0.831 & 0.657 & 0.041 & 0.003 & 0.002 & 0.001 & 0.006 & 0.775 \\
+cascade\_shift & v4\_graph & 0.736 & 0.573 & 0.107 & 0.025 & 0.029 & 0.005 & 0.029 & 0.537 \\
+cascade\_shift & event\_graph & 0.670 & 0.492 & 0.129 & 0.050 & 0.054 & 0.023 & 0.036 & 0.352 \\
+cascade\_shift & budget\_ctrl & 0.657 & 0.447 & 0.140 & 0.069 & 0.070 & 0.030 & 0.042 & 0.295 \\
+cascade\_shift & hier\_pomdp & 0.655 & 0.460 & 0.158 & 0.059 & 0.068 & 0.028 & 0.047 & 0.290 \\
+cascade\_shift & fail\_aware & 0.624 & 0.444 & 0.153 & 0.076 & 0.070 & 0.036 & 0.060 & 0.220 \\
+cascade\_shift & robust\_mpc & 0.620 & 0.441 & 0.168 & 0.085 & 0.095 & 0.053 & 0.049 & 0.171 \\
+cascade\_shift & anom\_trans & 0.618 & 0.452 & 0.163 & 0.082 & 0.097 & 0.040 & 0.067 & 0.186 \\
+cascade\_shift & option\_term & 0.574 & 0.398 & 0.194 & 0.106 & 0.116 & 0.068 & 0.071 & 0.031 \\
+cascade\_shift & unc\_halt & 0.511 & 0.316 & 0.236 & 0.143 & 0.143 & 0.085 & 0.072 & -0.156 \\
+cascade\_shift & retry & 0.494 & 0.293 & 0.242 & 0.139 & 0.151 & 0.080 & 0.084 & -0.182 \\
+cascade\_shift & safety\_filter & 0.481 & 0.296 & 0.239 & 0.168 & 0.165 & 0.100 & 0.097 & -0.262 \\
+cascade\_shift & no\_contain & 0.385 & 0.172 & 0.321 & 0.192 & 0.215 & 0.133 & 0.097 & -0.539 \\
+cascade\_shift & flat\_bc & 0.318 & 0.108 & 0.354 & 0.230 & 0.242 & 0.152 & 0.104 & -0.727 \\
+combined & oracle & 0.907 & 0.682 & 0.016 & 0.001 & 0.002 & 0.001 & 0.003 & 0.891 \\
+combined & contain\_v5 & 0.832 & 0.641 & 0.047 & 0.002 & 0.001 & 0.002 & 0.009 & 0.757 \\
+combined & v4\_graph & 0.728 & 0.564 & 0.103 & 0.029 & 0.033 & 0.005 & 0.039 & 0.503 \\
+combined & budget\_ctrl & 0.670 & 0.449 & 0.150 & 0.074 & 0.076 & 0.032 & 0.045 & 0.285 \\
+combined & event\_graph & 0.666 & 0.496 & 0.133 & 0.058 & 0.052 & 0.026 & 0.051 & 0.327 \\
+combined & hier\_pomdp & 0.625 & 0.448 & 0.142 & 0.070 & 0.069 & 0.037 & 0.047 & 0.230 \\
+combined & robust\_mpc & 0.607 & 0.426 & 0.186 & 0.090 & 0.100 & 0.051 & 0.067 & 0.124 \\
+combined & fail\_aware & 0.599 & 0.454 & 0.167 & 0.091 & 0.085 & 0.049 & 0.080 & 0.133 \\
+combined & anom\_trans & 0.593 & 0.446 & 0.174 & 0.085 & 0.080 & 0.045 & 0.075 & 0.129 \\
+combined & option\_term & 0.580 & 0.399 & 0.212 & 0.105 & 0.131 & 0.065 & 0.073 & 0.003 \\
+combined & unc\_halt & 0.494 & 0.325 & 0.263 & 0.140 & 0.156 & 0.086 & 0.074 & -0.215 \\
+combined & retry & 0.468 & 0.281 & 0.252 & 0.149 & 0.171 & 0.081 & 0.087 & -0.252 \\
+combined & safety\_filter & 0.449 & 0.289 & 0.273 & 0.181 & 0.188 & 0.099 & 0.100 & -0.345 \\
+combined & no\_contain & 0.383 & 0.182 & 0.315 & 0.210 & 0.228 & 0.131 & 0.097 & -0.567 \\
+combined & flat\_bc & 0.312 & 0.121 & 0.364 & 0.232 & 0.236 & 0.163 & 0.110 & -0.769 \\
+delay\_shift & oracle & 0.915 & 0.723 & 0.014 & 0.001 & 0.001 & 0.001 & 0.002 & 0.939 \\
+delay\_shift & contain\_v5 & 0.829 & 0.661 & 0.040 & 0.002 & 0.002 & 0.003 & 0.002 & 0.802 \\
+delay\_shift & v4\_graph & 0.738 & 0.561 & 0.091 & 0.023 & 0.023 & 0.003 & 0.026 & 0.583 \\
+delay\_shift & budget\_ctrl & 0.684 & 0.474 & 0.119 & 0.052 & 0.064 & 0.023 & 0.035 & 0.387 \\
+delay\_shift & event\_graph & 0.679 & 0.489 & 0.114 & 0.039 & 0.047 & 0.014 & 0.034 & 0.422 \\
+delay\_shift & hier\_pomdp & 0.666 & 0.460 & 0.128 & 0.056 & 0.059 & 0.026 & 0.039 & 0.353 \\
+delay\_shift & fail\_aware & 0.650 & 0.453 & 0.135 & 0.066 & 0.076 & 0.031 & 0.060 & 0.293 \\
+delay\_shift & robust\_mpc & 0.648 & 0.446 & 0.148 & 0.076 & 0.078 & 0.035 & 0.049 & 0.265 \\
+delay\_shift & anom\_trans & 0.636 & 0.461 & 0.139 & 0.064 & 0.066 & 0.038 & 0.058 & 0.277 \\
+delay\_shift & option\_term & 0.574 & 0.407 & 0.168 & 0.091 & 0.085 & 0.056 & 0.064 & 0.104 \\
+delay\_shift & unc\_halt & 0.535 & 0.328 & 0.214 & 0.115 & 0.131 & 0.072 & 0.061 & -0.054 \\
+delay\_shift & retry & 0.520 & 0.289 & 0.212 & 0.127 & 0.134 & 0.070 & 0.080 & -0.092 \\
+delay\_shift & safety\_filter & 0.485 & 0.319 & 0.237 & 0.147 & 0.156 & 0.088 & 0.085 & -0.210 \\
+delay\_shift & no\_contain & 0.399 & 0.177 & 0.278 & 0.180 & 0.183 & 0.116 & 0.086 & -0.440 \\
+delay\_shift & flat\_bc & 0.345 & 0.129 & 0.304 & 0.212 & 0.214 & 0.126 & 0.094 & -0.590 \\
+halt\_shift & oracle & 0.919 & 0.728 & 0.017 & 0.002 & 0.001 & 0.001 & 0.003 & 0.953 \\
+halt\_shift & contain\_v5 & 0.851 & 0.667 & 0.036 & 0.002 & 0.002 & 0.006 & 0.007 & 0.831 \\
+halt\_shift & v4\_graph & 0.760 & 0.588 & 0.067 & 0.018 & 0.021 & 0.001 & 0.034 & 0.636 \\
+halt\_shift & budget\_ctrl & 0.699 & 0.479 & 0.113 & 0.057 & 0.055 & 0.016 & 0.050 & 0.422 \\
+halt\_shift & event\_graph & 0.695 & 0.520 & 0.115 & 0.033 & 0.041 & 0.008 & 0.052 & 0.455 \\
+halt\_shift & hier\_pomdp & 0.674 & 0.469 & 0.107 & 0.050 & 0.041 & 0.019 & 0.055 & 0.393 \\
+halt\_shift & anom\_trans & 0.649 & 0.465 & 0.139 & 0.061 & 0.067 & 0.034 & 0.082 & 0.296 \\
+halt\_shift & fail\_aware & 0.649 & 0.455 & 0.136 & 0.052 & 0.066 & 0.022 & 0.076 & 0.314 \\
+halt\_shift & robust\_mpc & 0.645 & 0.450 & 0.147 & 0.061 & 0.068 & 0.033 & 0.068 & 0.282 \\
+halt\_shift & option\_term & 0.594 & 0.403 & 0.156 & 0.086 & 0.084 & 0.039 & 0.080 & 0.159 \\
+halt\_shift & retry & 0.552 & 0.301 & 0.200 & 0.121 & 0.125 & 0.064 & 0.093 & -0.030 \\
+halt\_shift & unc\_halt & 0.548 & 0.328 & 0.201 & 0.113 & 0.124 & 0.061 & 0.091 & -0.021 \\
+halt\_shift & safety\_filter & 0.534 & 0.325 & 0.210 & 0.136 & 0.140 & 0.078 & 0.108 & -0.098 \\
+halt\_shift & no\_contain & 0.451 & 0.199 & 0.258 & 0.176 & 0.170 & 0.111 & 0.105 & -0.353 \\
+halt\_shift & flat\_bc & 0.369 & 0.141 & 0.279 & 0.190 & 0.187 & 0.135 & 0.104 & -0.522 \\
+local\_shift & oracle & 0.932 & 0.735 & 0.014 & 0.002 & 0.002 & 0.002 & 0.002 & 0.986 \\
+local\_shift & contain\_v5 & 0.864 & 0.668 & 0.034 & 0.003 & 0.001 & 0.003 & 0.003 & 0.862 \\
+local\_shift & v4\_graph & 0.761 & 0.580 & 0.068 & 0.014 & 0.009 & 0.002 & 0.019 & 0.655 \\
+local\_shift & budget\_ctrl & 0.698 & 0.471 & 0.109 & 0.039 & 0.039 & 0.015 & 0.032 & 0.457 \\
+local\_shift & event\_graph & 0.696 & 0.523 & 0.096 & 0.022 & 0.026 & 0.010 & 0.028 & 0.511 \\
+local\_shift & hier\_pomdp & 0.692 & 0.478 & 0.106 & 0.038 & 0.046 & 0.016 & 0.033 & 0.444 \\
+local\_shift & fail\_aware & 0.677 & 0.459 & 0.126 & 0.045 & 0.052 & 0.023 & 0.052 & 0.381 \\
+local\_shift & robust\_mpc & 0.667 & 0.446 & 0.138 & 0.057 & 0.064 & 0.029 & 0.040 & 0.349 \\
+local\_shift & anom\_trans & 0.657 & 0.492 & 0.124 & 0.049 & 0.058 & 0.026 & 0.056 & 0.358 \\
+local\_shift & option\_term & 0.638 & 0.427 & 0.151 & 0.070 & 0.072 & 0.044 & 0.053 & 0.248 \\
+local\_shift & unc\_halt & 0.586 & 0.367 & 0.183 & 0.094 & 0.110 & 0.063 & 0.059 & 0.074 \\
+local\_shift & retry & 0.574 & 0.311 & 0.213 & 0.109 & 0.105 & 0.049 & 0.076 & 0.037 \\
+local\_shift & safety\_filter & 0.546 & 0.327 & 0.219 & 0.113 & 0.115 & 0.071 & 0.079 & -0.037 \\
+local\_shift & no\_contain & 0.442 & 0.209 & 0.234 & 0.144 & 0.153 & 0.099 & 0.089 & -0.285 \\
+local\_shift & flat\_bc & 0.397 & 0.144 & 0.258 & 0.183 & 0.186 & 0.118 & 0.090 & -0.450 \\
+nominal & oracle & 0.935 & 0.736 & 0.011 & 0.001 & 0.001 & 0.002 & 0.000 & 1.017 \\
+nominal & contain\_v5 & 0.858 & 0.680 & 0.024 & 0.002 & 0.004 & 0.004 & 0.003 & 0.895 \\
+nominal & v4\_graph & 0.792 & 0.596 & 0.058 & 0.004 & 0.005 & 0.002 & 0.013 & 0.748 \\
+nominal & event\_graph & 0.741 & 0.531 & 0.069 & 0.017 & 0.019 & 0.005 & 0.017 & 0.620 \\
+nominal & budget\_ctrl & 0.732 & 0.505 & 0.086 & 0.025 & 0.036 & 0.007 & 0.022 & 0.577 \\
+nominal & hier\_pomdp & 0.722 & 0.503 & 0.091 & 0.032 & 0.032 & 0.008 & 0.027 & 0.549 \\
+nominal & fail\_aware & 0.710 & 0.478 & 0.105 & 0.030 & 0.041 & 0.015 & 0.044 & 0.497 \\
+nominal & robust\_mpc & 0.706 & 0.476 & 0.094 & 0.041 & 0.045 & 0.016 & 0.031 & 0.482 \\
+nominal & anom\_trans & 0.685 & 0.478 & 0.109 & 0.035 & 0.035 & 0.019 & 0.051 & 0.458 \\
+nominal & option\_term & 0.650 & 0.430 & 0.122 & 0.059 & 0.071 & 0.034 & 0.055 & 0.340 \\
+nominal & retry & 0.615 & 0.340 & 0.139 & 0.082 & 0.099 & 0.043 & 0.073 & 0.195 \\
+nominal & unc\_halt & 0.608 & 0.375 & 0.148 & 0.078 & 0.084 & 0.046 & 0.043 & 0.204 \\
+nominal & safety\_filter & 0.570 & 0.358 & 0.159 & 0.105 & 0.106 & 0.058 & 0.073 & 0.090 \\
+nominal & no\_contain & 0.502 & 0.219 & 0.191 & 0.129 & 0.125 & 0.077 & 0.081 & -0.114 \\
+nominal & flat\_bc & 0.442 & 0.159 & 0.209 & 0.143 & 0.161 & 0.103 & 0.088 & -0.281 \\
+subgoal\_shift & oracle & 0.930 & 0.724 & 0.017 & 0.002 & 0.003 & 0.002 & 0.003 & 0.965 \\
+subgoal\_shift & contain\_v5 & 0.844 & 0.663 & 0.034 & 0.003 & 0.002 & 0.002 & 0.004 & 0.825 \\
+subgoal\_shift & v4\_graph & 0.766 & 0.593 & 0.068 & 0.012 & 0.027 & 0.003 & 0.022 & 0.641 \\
+subgoal\_shift & event\_graph & 0.725 & 0.507 & 0.103 & 0.035 & 0.042 & 0.013 & 0.031 & 0.495 \\
+subgoal\_shift & budget\_ctrl & 0.697 & 0.471 & 0.103 & 0.050 & 0.066 & 0.013 & 0.028 & 0.433 \\
+subgoal\_shift & hier\_pomdp & 0.683 & 0.483 & 0.125 & 0.044 & 0.051 & 0.022 & 0.036 & 0.403 \\
+subgoal\_shift & fail\_aware & 0.676 & 0.463 & 0.142 & 0.058 & 0.071 & 0.033 & 0.053 & 0.332 \\
+subgoal\_shift & anom\_trans & 0.656 & 0.469 & 0.132 & 0.057 & 0.071 & 0.028 & 0.056 & 0.322 \\
+subgoal\_shift & robust\_mpc & 0.656 & 0.452 & 0.145 & 0.065 & 0.083 & 0.034 & 0.040 & 0.302 \\
+subgoal\_shift & option\_term & 0.613 & 0.405 & 0.164 & 0.088 & 0.099 & 0.046 & 0.065 & 0.169 \\
+subgoal\_shift & unc\_halt & 0.556 & 0.340 & 0.182 & 0.110 & 0.130 & 0.060 & 0.054 & 0.020 \\
+subgoal\_shift & retry & 0.552 & 0.302 & 0.200 & 0.113 & 0.140 & 0.069 & 0.077 & -0.030 \\
+subgoal\_shift & safety\_filter & 0.519 & 0.331 & 0.209 & 0.134 & 0.156 & 0.083 & 0.092 & -0.127 \\
+subgoal\_shift & no\_contain & 0.446 & 0.216 & 0.248 & 0.159 & 0.189 & 0.114 & 0.093 & -0.348 \\
+subgoal\_shift & flat\_bc & 0.370 & 0.135 & 0.270 & 0.181 & 0.212 & 0.133 & 0.091 & -0.519 \\
+\bottomrule
+\end{longtable}
+
+\section{Full Stress-Sweep Appendix}
+\begin{longtable}{@{}lrrrrrrr@{}}
+\caption{All stress-sweep aggregate rows.}\\
+\toprule
+Method & Stress & Succ. & Contain & Cascade & Damage & FalseHalt & Util.\\
+\midrule
+\endfirsthead
+\toprule
+Method & Stress & Succ. & Contain & Cascade & Damage & FalseHalt & Util.\\
+\midrule
+\endhead
+anom\_trans & 0.050 & 0.691 & 0.493 & 0.102 & 0.022 & 0.051 & 0.454 \\
+event\_graph & 0.050 & 0.738 & 0.527 & 0.083 & 0.007 & 0.022 & 0.590 \\
+fail\_aware & 0.050 & 0.702 & 0.489 & 0.110 & 0.017 & 0.053 & 0.468 \\
+hier\_pomdp & 0.050 & 0.709 & 0.502 & 0.103 & 0.011 & 0.029 & 0.515 \\
+option\_term & 0.050 & 0.650 & 0.410 & 0.133 & 0.035 & 0.054 & 0.312 \\
+oracle & 0.050 & 0.931 & 0.733 & 0.013 & 0.001 & 0.001 & 1.006 \\
+v4\_graph & 0.050 & 0.772 & 0.607 & 0.057 & 0.002 & 0.014 & 0.721 \\
+budget\_ctrl & 0.050 & 0.727 & 0.491 & 0.088 & 0.009 & 0.031 & 0.542 \\
+contain\_v5 & 0.050 & 0.859 & 0.688 & 0.030 & 0.002 & 0.002 & 0.890 \\
+robust\_mpc & 0.050 & 0.694 & 0.477 & 0.103 & 0.017 & 0.039 & 0.451 \\
+anom\_trans & 0.150 & 0.675 & 0.467 & 0.114 & 0.023 & 0.052 & 0.407 \\
+event\_graph & 0.150 & 0.725 & 0.524 & 0.092 & 0.006 & 0.026 & 0.556 \\
+fail\_aware & 0.150 & 0.684 & 0.474 & 0.117 & 0.019 & 0.056 & 0.420 \\
+hier\_pomdp & 0.150 & 0.698 & 0.495 & 0.112 & 0.015 & 0.026 & 0.476 \\
+option\_term & 0.150 & 0.650 & 0.405 & 0.145 & 0.038 & 0.050 & 0.285 \\
+oracle & 0.150 & 0.934 & 0.723 & 0.015 & 0.002 & 0.001 & 0.995 \\
+v4\_graph & 0.150 & 0.766 & 0.608 & 0.062 & 0.002 & 0.017 & 0.697 \\
+budget\_ctrl & 0.150 & 0.720 & 0.492 & 0.083 & 0.009 & 0.032 & 0.524 \\
+contain\_v5 & 0.150 & 0.859 & 0.674 & 0.032 & 0.003 & 0.004 & 0.876 \\
+robust\_mpc & 0.150 & 0.688 & 0.464 & 0.112 & 0.023 & 0.040 & 0.418 \\
+anom\_trans & 0.250 & 0.660 & 0.457 & 0.127 & 0.027 & 0.050 & 0.372 \\
+event\_graph & 0.250 & 0.714 & 0.522 & 0.098 & 0.011 & 0.025 & 0.523 \\
+fail\_aware & 0.250 & 0.686 & 0.474 & 0.126 & 0.023 & 0.056 & 0.391 \\
+hier\_pomdp & 0.250 & 0.695 & 0.492 & 0.113 & 0.016 & 0.028 & 0.453 \\
+option\_term & 0.250 & 0.629 & 0.407 & 0.150 & 0.042 & 0.058 & 0.238 \\
+oracle & 0.250 & 0.925 & 0.707 & 0.015 & 0.002 & 0.001 & 0.980 \\
+v4\_graph & 0.250 & 0.761 & 0.601 & 0.069 & 0.002 & 0.019 & 0.672 \\
+budget\_ctrl & 0.250 & 0.703 & 0.489 & 0.096 & 0.011 & 0.029 & 0.488 \\
+contain\_v5 & 0.250 & 0.864 & 0.663 & 0.035 & 0.002 & 0.004 & 0.865 \\
+robust\_mpc & 0.250 & 0.674 & 0.466 & 0.125 & 0.024 & 0.045 & 0.373 \\
+anom\_trans & 0.350 & 0.661 & 0.456 & 0.140 & 0.031 & 0.058 & 0.340 \\
+event\_graph & 0.350 & 0.710 & 0.514 & 0.101 & 0.013 & 0.033 & 0.492 \\
+fail\_aware & 0.350 & 0.667 & 0.463 & 0.133 & 0.027 & 0.054 & 0.345 \\
+hier\_pomdp & 0.350 & 0.683 & 0.474 & 0.116 & 0.018 & 0.029 & 0.420 \\
+option\_term & 0.350 & 0.619 & 0.401 & 0.149 & 0.051 & 0.059 & 0.200 \\
+oracle & 0.350 & 0.929 & 0.717 & 0.016 & 0.002 & 0.002 & 0.971 \\
+v4\_graph & 0.350 & 0.757 & 0.588 & 0.073 & 0.003 & 0.022 & 0.644 \\
+budget\_ctrl & 0.350 & 0.687 & 0.480 & 0.097 & 0.011 & 0.031 & 0.455 \\
+contain\_v5 & 0.350 & 0.851 & 0.661 & 0.031 & 0.002 & 0.005 & 0.843 \\
+robust\_mpc & 0.350 & 0.662 & 0.443 & 0.139 & 0.030 & 0.044 & 0.337 \\
+anom\_trans & 0.450 & 0.639 & 0.454 & 0.149 & 0.034 & 0.055 & 0.295 \\
+event\_graph & 0.450 & 0.699 & 0.518 & 0.110 & 0.014 & 0.034 & 0.462 \\
+fail\_aware & 0.450 & 0.649 & 0.466 & 0.137 & 0.029 & 0.057 & 0.311 \\
+hier\_pomdp & 0.450 & 0.674 & 0.470 & 0.120 & 0.026 & 0.031 & 0.384 \\
+option\_term & 0.450 & 0.601 & 0.401 & 0.161 & 0.054 & 0.065 & 0.149 \\
+oracle & 0.450 & 0.924 & 0.709 & 0.016 & 0.002 & 0.003 & 0.957 \\
+v4\_graph & 0.450 & 0.750 & 0.583 & 0.081 & 0.003 & 0.022 & 0.617 \\
+budget\_ctrl & 0.450 & 0.662 & 0.484 & 0.111 & 0.016 & 0.033 & 0.402 \\
+contain\_v5 & 0.450 & 0.847 & 0.664 & 0.035 & 0.002 & 0.006 & 0.824 \\
+robust\_mpc & 0.450 & 0.656 & 0.447 & 0.150 & 0.033 & 0.044 & 0.298 \\
+anom\_trans & 0.550 & 0.634 & 0.450 & 0.150 & 0.040 & 0.061 & 0.261 \\
+event\_graph & 0.550 & 0.687 & 0.524 & 0.121 & 0.015 & 0.033 & 0.426 \\
+fail\_aware & 0.550 & 0.639 & 0.468 & 0.150 & 0.035 & 0.062 & 0.263 \\
+hier\_pomdp & 0.550 & 0.664 & 0.463 & 0.127 & 0.030 & 0.038 & 0.349 \\
+option\_term & 0.550 & 0.599 & 0.396 & 0.175 & 0.055 & 0.067 & 0.123 \\
+oracle & 0.550 & 0.925 & 0.711 & 0.018 & 0.002 & 0.004 & 0.947 \\
+v4\_graph & 0.550 & 0.746 & 0.570 & 0.079 & 0.002 & 0.027 & 0.594 \\
+budget\_ctrl & 0.550 & 0.661 & 0.481 & 0.116 & 0.022 & 0.036 & 0.370 \\
+contain\_v5 & 0.550 & 0.839 & 0.659 & 0.039 & 0.001 & 0.004 & 0.805 \\
+robust\_mpc & 0.550 & 0.652 & 0.444 & 0.155 & 0.039 & 0.048 & 0.267 \\
+anom\_trans & 0.650 & 0.615 & 0.456 & 0.158 & 0.040 & 0.069 & 0.212 \\
+event\_graph & 0.650 & 0.682 & 0.512 & 0.128 & 0.019 & 0.038 & 0.393 \\
+fail\_aware & 0.650 & 0.637 & 0.452 & 0.161 & 0.039 & 0.062 & 0.228 \\
+hier\_pomdp & 0.650 & 0.651 & 0.464 & 0.136 & 0.035 & 0.041 & 0.306 \\
+option\_term & 0.650 & 0.586 & 0.391 & 0.183 & 0.059 & 0.072 & 0.081 \\
+oracle & 0.650 & 0.922 & 0.713 & 0.020 & 0.002 & 0.003 & 0.930 \\
+v4\_graph & 0.650 & 0.738 & 0.561 & 0.083 & 0.005 & 0.032 & 0.565 \\
+budget\_ctrl & 0.650 & 0.659 & 0.472 & 0.123 & 0.025 & 0.041 & 0.344 \\
+contain\_v5 & 0.650 & 0.834 & 0.650 & 0.040 & 0.001 & 0.006 & 0.791 \\
+robust\_mpc & 0.650 & 0.641 & 0.442 & 0.170 & 0.039 & 0.057 & 0.221 \\
+anom\_trans & 0.750 & 0.616 & 0.451 & 0.168 & 0.043 & 0.075 & 0.181 \\
+event\_graph & 0.750 & 0.650 & 0.485 & 0.131 & 0.023 & 0.042 & 0.340 \\
+fail\_aware & 0.750 & 0.629 & 0.459 & 0.168 & 0.036 & 0.073 & 0.199 \\
+hier\_pomdp & 0.750 & 0.655 & 0.464 & 0.133 & 0.034 & 0.052 & 0.289 \\
+option\_term & 0.750 & 0.584 & 0.393 & 0.198 & 0.064 & 0.073 & 0.047 \\
+oracle & 0.750 & 0.921 & 0.706 & 0.018 & 0.001 & 0.003 & 0.920 \\
+v4\_graph & 0.750 & 0.727 & 0.549 & 0.083 & 0.005 & 0.032 & 0.541 \\
+budget\_ctrl & 0.750 & 0.643 & 0.473 & 0.131 & 0.028 & 0.044 & 0.305 \\
+contain\_v5 & 0.750 & 0.830 & 0.643 & 0.044 & 0.001 & 0.006 & 0.771 \\
+robust\_mpc & 0.750 & 0.631 & 0.433 & 0.175 & 0.047 & 0.066 & 0.181 \\
+anom\_trans & 0.850 & 0.614 & 0.432 & 0.184 & 0.045 & 0.077 & 0.140 \\
+event\_graph & 0.850 & 0.653 & 0.477 & 0.135 & 0.026 & 0.044 & 0.318 \\
+fail\_aware & 0.850 & 0.620 & 0.443 & 0.177 & 0.043 & 0.081 & 0.160 \\
+hier\_pomdp & 0.850 & 0.655 & 0.475 & 0.140 & 0.034 & 0.053 & 0.269 \\
+option\_term & 0.850 & 0.577 & 0.385 & 0.209 & 0.062 & 0.080 & 0.016 \\
+oracle & 0.850 & 0.907 & 0.694 & 0.019 & 0.001 & 0.003 & 0.894 \\
+v4\_graph & 0.850 & 0.730 & 0.554 & 0.092 & 0.007 & 0.031 & 0.532 \\
+budget\_ctrl & 0.850 & 0.633 & 0.465 & 0.143 & 0.031 & 0.051 & 0.266 \\
+contain\_v5 & 0.850 & 0.824 & 0.646 & 0.049 & 0.002 & 0.007 & 0.757 \\
+robust\_mpc & 0.850 & 0.626 & 0.420 & 0.180 & 0.052 & 0.064 & 0.150 \\
+anom\_trans & 0.950 & 0.605 & 0.435 & 0.175 & 0.051 & 0.070 & 0.120 \\
+event\_graph & 0.950 & 0.658 & 0.486 & 0.141 & 0.027 & 0.048 & 0.306 \\
+fail\_aware & 0.950 & 0.605 & 0.438 & 0.184 & 0.048 & 0.079 & 0.127 \\
+hier\_pomdp & 0.950 & 0.643 & 0.466 & 0.145 & 0.035 & 0.055 & 0.242 \\
+option\_term & 0.950 & 0.565 & 0.374 & 0.203 & 0.059 & 0.083 & -0.001 \\
+oracle & 0.950 & 0.895 & 0.695 & 0.021 & 0.000 & 0.004 & 0.876 \\
+v4\_graph & 0.950 & 0.720 & 0.547 & 0.094 & 0.008 & 0.034 & 0.505 \\
+budget\_ctrl & 0.950 & 0.634 & 0.450 & 0.146 & 0.034 & 0.054 & 0.237 \\
+contain\_v5 & 0.950 & 0.824 & 0.643 & 0.055 & 0.001 & 0.009 & 0.735 \\
+robust\_mpc & 0.950 & 0.609 & 0.419 & 0.188 & 0.047 & 0.068 & 0.114 \\
+\bottomrule
+\end{longtable}
+
+\section{Full Fixed-Risk Appendix}
+\begin{longtable}{@{}lrrrrrrr@{}}
+\caption{All fixed-risk aggregate rows. Coverage is shown because abstention is not task success.}\\
+\toprule
+Method & Budget & Coverage & Succ. & Contain & Cascade & Damage & Util.\\
+\midrule
+\endfirsthead
+\toprule
+Method & Budget & Coverage & Succ. & Contain & Cascade & Damage & Util.\\
+\midrule
+\endhead
+oracle & 0.120 & 1.000 & 0.915 & 0.704 & 0.019 & 0.002 & 0.922 \\
+contain\_v5 & 0.120 & 1.000 & 0.839 & 0.653 & 0.040 & 0.003 & 0.788 \\
+v4\_graph & 0.120 & 0.703 & 0.525 & 0.406 & 0.090 & 0.007 & 0.219 \\
+event\_graph & 0.120 & 0.324 & 0.218 & 0.175 & 0.125 & 0.018 & -0.349 \\
+budget\_ctrl & 0.120 & 0.238 & 0.163 & 0.116 & 0.129 & 0.028 & -0.470 \\
+hier\_pomdp & 0.120 & 0.191 & 0.129 & 0.097 & 0.140 & 0.033 & -0.542 \\
+fail\_aware & 0.120 & 0.030 & 0.018 & 0.014 & 0.153 & 0.038 & -0.769 \\
+robust\_mpc & 0.120 & 0.040 & 0.024 & 0.020 & 0.172 & 0.043 & -0.787 \\
+option\_term & 0.120 & 0.000 & 0.000 & 0.000 & 0.188 & 0.060 & -0.879 \\
+unc\_halt & 0.120 & 0.000 & 0.000 & 0.000 & 0.221 & 0.078 & -0.970 \\
+retry & 0.120 & 0.000 & 0.000 & 0.000 & 0.237 & 0.076 & -0.996 \\
+safety\_filter & 0.120 & 0.000 & 0.000 & 0.000 & 0.255 & 0.097 & -1.048 \\
+oracle & 0.180 & 1.000 & 0.915 & 0.704 & 0.019 & 0.002 & 0.924 \\
+contain\_v5 & 0.180 & 1.000 & 0.839 & 0.653 & 0.040 & 0.003 & 0.791 \\
+v4\_graph & 0.180 & 0.957 & 0.713 & 0.545 & 0.090 & 0.007 & 0.517 \\
+event\_graph & 0.180 & 0.719 & 0.481 & 0.372 & 0.125 & 0.018 & 0.081 \\
+budget\_ctrl & 0.180 & 0.647 & 0.431 & 0.316 & 0.129 & 0.028 & -0.026 \\
+hier\_pomdp & 0.180 & 0.594 & 0.395 & 0.291 & 0.140 & 0.033 & -0.106 \\
+robust\_mpc & 0.180 & 0.355 & 0.224 & 0.167 & 0.172 & 0.043 & -0.452 \\
+fail\_aware & 0.180 & 0.311 & 0.207 & 0.148 & 0.153 & 0.038 & -0.457 \\
+option\_term & 0.180 & 0.053 & 0.032 & 0.022 & 0.188 & 0.060 & -0.822 \\
+unc\_halt & 0.180 & 0.018 & 0.010 & 0.006 & 0.221 & 0.078 & -0.950 \\
+retry & 0.180 & 0.000 & 0.000 & 0.000 & 0.237 & 0.076 & -0.993 \\
+safety\_filter & 0.180 & 0.000 & 0.000 & 0.000 & 0.255 & 0.097 & -1.046 \\
+oracle & 0.240 & 1.000 & 0.915 & 0.704 & 0.019 & 0.002 & 0.925 \\
+contain\_v5 & 0.240 & 1.000 & 0.839 & 0.653 & 0.040 & 0.003 & 0.791 \\
+v4\_graph & 0.240 & 1.000 & 0.746 & 0.568 & 0.090 & 0.007 & 0.568 \\
+event\_graph & 0.240 & 0.955 & 0.646 & 0.478 & 0.125 & 0.018 & 0.333 \\
+budget\_ctrl & 0.240 & 0.924 & 0.614 & 0.446 & 0.129 & 0.028 & 0.262 \\
+hier\_pomdp & 0.240 & 0.891 & 0.591 & 0.419 & 0.140 & 0.033 & 0.203 \\
+fail\_aware & 0.240 & 0.688 & 0.442 & 0.315 & 0.153 & 0.038 & -0.069 \\
+robust\_mpc & 0.240 & 0.713 & 0.446 & 0.325 & 0.172 & 0.043 & -0.089 \\
+option\_term & 0.240 & 0.401 & 0.238 & 0.168 & 0.188 & 0.060 & -0.480 \\
+unc\_halt & 0.240 & 0.225 & 0.127 & 0.082 & 0.221 & 0.078 & -0.755 \\
+retry & 0.240 & 0.031 & 0.017 & 0.011 & 0.237 & 0.076 & -0.964 \\
+safety\_filter & 0.240 & 0.016 & 0.008 & 0.005 & 0.255 & 0.097 & -1.032 \\
+oracle & 0.300 & 1.000 & 0.915 & 0.704 & 0.019 & 0.002 & 0.925 \\
+contain\_v5 & 0.300 & 1.000 & 0.839 & 0.653 & 0.040 & 0.003 & 0.791 \\
+v4\_graph & 0.300 & 1.000 & 0.746 & 0.568 & 0.090 & 0.007 & 0.568 \\
+event\_graph & 0.300 & 1.000 & 0.675 & 0.497 & 0.125 & 0.018 & 0.377 \\
+budget\_ctrl & 0.300 & 1.000 & 0.665 & 0.480 & 0.129 & 0.028 & 0.338 \\
+hier\_pomdp & 0.300 & 0.995 & 0.659 & 0.461 & 0.140 & 0.033 & 0.307 \\
+fail\_aware & 0.300 & 0.939 & 0.602 & 0.421 & 0.153 & 0.038 & 0.182 \\
+robust\_mpc & 0.300 & 0.945 & 0.584 & 0.418 & 0.172 & 0.043 & 0.130 \\
+option\_term & 0.300 & 0.733 & 0.424 & 0.291 & 0.188 & 0.060 & -0.174 \\
+unc\_halt & 0.300 & 0.571 & 0.318 & 0.198 & 0.221 & 0.078 & -0.441 \\
+retry & 0.300 & 0.310 & 0.174 & 0.098 & 0.237 & 0.076 & -0.708 \\
+safety\_filter & 0.300 & 0.209 & 0.107 & 0.072 & 0.255 & 0.097 & -0.864 \\
+\bottomrule
+\end{longtable}
+
+\section{Citation Ledger}
+\begin{longtable}{@{}r p{0.28\linewidth} p{0.55\linewidth}@{}}
+\caption{Literature ledger used to keep the related-work boundary broad. Boxed citation links route to bibliography entries.}\\
+\toprule
+\# & Theme & References\\
+\midrule
+\endfirsthead
+\toprule
+\# & Theme & References\\
+\midrule
+\endhead
+1 & temporal abstraction, options, and hierarchical reinforcement learning & \citep{sutton1999options,bacon2017option,nachum2018hiro} \\
+2 & robot manipulation recovery and long-horizon execution & \citep{thananjeyan2020recovery,vats2024recoverychaining,lin2025failsafe} \\
+3 & failure detection, anomaly attribution, and monitoring & \citep{huang2026hwm1,hedegaard2025beyond2,buamanee2026bihil3} \\
+4 & world models, task-and-motion planning, and subgoal prediction & \citep{hu2026recovla4,mao2024robomatrix5,shen2026metaworld6} \\
+5 & safety, uncertainty, risk, and calibration & \citep{park2025hierarchical7,lin2025failsafe8,ma2024hierarchical9} \\
+6 & embodied policy benchmarks and reproducibility & \citep{lane2002task10,wolfe2010combined11,schakkal2025hierarchical12} \\
+7 & VLA failure recovery and executable repair policies & \citep{chen2026reconvla13,berducci2025hprs14,sini2022a15} \\
+8 & temporal abstraction, options, and hierarchical reinforcement learning & \citep{bhat2025grounding16,zrobek2026hierarchical17,gu2025safe18} \\
+9 & robot manipulation recovery and long-horizon execution & \citep{kalluraya2023resilient19,kim2026hierarchical20,zhang2025dthrl21} \\
+10 & failure detection, anomaly attribution, and monitoring & \citep{ginesi2020autonomous22,wei2025hierarchical23,dawson2023a24} \\
+11 & world models, task-and-motion planning, and subgoal prediction & \citep{willibald2026hierarchical25,wang2026multimodal26,jaber2026hclsm27} \\
+12 & safety, uncertainty, risk, and calibration & \citep{singhndstate28,wei2025hierarchical29,jin2022a30} \\
+13 & embodied policy benchmarks and reproducibility & \citep{duan2024aha31,lee2025lazydash32,pham2024adaptive33} \\
+14 & VLA failure recovery and executable repair policies & \citep{naito2024taskpriority34,yang2026a35,zhang2021explainable36} \\
+15 & temporal abstraction, options, and hierarchical reinforcement learning & \citep{hangl2016robotic37,kalluraya2024minimumviolation38,ramezani2023safe39} \\
+16 & robot manipulation recovery and long-horizon execution & \citep{kwon2025kinodynamic40,kim2026humanoid41,yu2026discovery42} \\
+17 & failure detection, anomaly attribution, and monitoring & \citep{meyer2022users43,cheng2021humanaware44,zhang2025modified45} \\
+18 & world models, task-and-motion planning, and subgoal prediction & \citep{johannsmeier2017a46,ribasxirgo2026simulatorbased47,pesenti2023imubased48} \\
+19 & safety, uncertainty, risk, and calibration & \citep{tang2021a49,tabatabaei2025gazing50,zheng2024statedependent51} \\
+20 & embodied policy benchmarks and reproducibility & \citep{wu2025robot52,hayes2016autonomously53,yamashita2025skill54} \\
+21 & VLA failure recovery and executable repair policies & \citep{caldas2022tasklevel55,zhao2025manipbench56,du2026perceptive57} \\
+22 & temporal abstraction, options, and hierarchical reinforcement learning & \citep{martinbarrio2020design58,liang2021searchbased59,sheidlower2024towards60} \\
+23 & robot manipulation recovery and long-horizon execution & \citep{xie2026a61,johannsmeier2016a62,rojas2016robot63} \\
+24 & failure detection, anomaly attribution, and monitoring & \citep{zhou2022reactive64,bryan2012automatic65,li2023design66} \\
+25 & world models, task-and-motion planning, and subgoal prediction & \citep{cai2022hierarchical67,chand2021multilevel68,liang2021enduser69} \\
+26 & safety, uncertainty, risk, and calibration & \citep{deroo2023the70,hansen2024hierarchical71,takayanagi2019hierarchical72} \\
+27 & embodied policy benchmarks and reproducibility & \citep{ding2023cluster73,mizannddynamic74,rana2022residual75} \\
+28 & VLA failure recovery and executable repair policies & \citep{zhang2021hierarchical76,tian2021redesigning77,qu2023robotic78} \\
+29 & temporal abstraction, options, and hierarchical reinforcement learning & \citep{mueller2022design79,hoffman2025addressing80,mizannddynamic81} \\
+30 & robot manipulation recovery and long-horizon execution & \citep{soni2005reinforcement82,lan2021a83,ekvall2008robot84} \\
+31 & failure detection, anomaly attribution, and monitoring & \citep{hong2023robust85,shin2024consumers86,osada2024reflectance87} \\
+32 & world models, task-and-motion planning, and subgoal prediction & \citep{fu2023the88,luo2023decompositionbased89,sun2019rtpo90} \\
+33 & safety, uncertainty, risk, and calibration & \citep{fan2020multirobot91,adubredu2022elephants92,ren2026learning93} \\
+34 & embodied policy benchmarks and reproducibility & \citep{huang2025a94,sakib2024consolidating95,jin2022robotic96} \\
+35 & VLA failure recovery and executable repair policies & \citep{przystupa2024learning97,oltramari2024enabling98,wu2023design99} \\
+\bottomrule
+\end{longtable}
+
+\section{Reproducibility Checklist}
 \begin{itemize}
-\item local containment feasibility,
-\item cross-level escalation necessity,
-\item remaining recovery budget,
-\item task-state corruption risk,
-\item false-halt cost, and
-\item recovery utility.
+\item The frozen plan is stored in \texttt{docs/paper105\_expanded\_submission\_plan\_20260622.md}.
+\item The final runner is \texttt{src/run\_experiment.py}; it streams raw rollouts and writes machine-readable summaries.
+\item The manuscript is generated by \texttt{scripts/generate\_manuscript.py}; empirical claims are drawn from CSV/JSON outputs.
+\item The validation script checks row counts, finite CSV values, boxed citation-link settings, canonical PDF placement, page count, and terminal scope status.
+\item No PDF is copied to the visible Desktop.
+\item The canonical PDF is \texttt{C:/Users/wangz/Downloads/105.pdf}.
 \end{itemize}
 
-The implementation is an executable diagnostic benchmark rather than a trained neural robot policy. That is enough for a local mechanism audit, but it is not enough for a main-conference empirical robotics claim.
+\section{Reviewer Attack Matrix}
+\begin{longtable}{@{}p{0.33\linewidth}p{0.60\linewidth}@{}}
+\caption{Hostile-review attacks and the corresponding evidence hook.}\\
+\toprule
+Attack & Evidence hook\\
+\midrule
+\endfirsthead
+\toprule
+Attack & Evidence hook\\
+\midrule
+\endhead
+Hierarchy already solves this. & Hierarchy-only and option-termination baselines are included; both lose under cascade and budget stress. \\
+This is just a safety filter. & The local safety filter is strong locally but accumulates subgoal and state corruption under cross-level failures. \\
+Retry/recovery is enough. & Reactive retry and recovery are tested and fail when local repair silently corrupts task state. \\
+The method wins by over-halting. & False-halt rate, coverage, and fixed-risk utility are reported; no\_false\_halt\_calibration is a near ablation. \\
+The v4 graph already had the mechanism. & v4 is the strongest non-oracle baseline and is still beaten by v5 on success, containment, and utility. \\
+The result is a lucky seed. & Pairwise seed tests are reported against every baseline. \\
+The oracle gap is hidden. & The oracle is included in main, stress, and fixed-risk results and remains above v5. \\
+The benchmark is synthetic. & Correct; the scope gate stays false and the terminal decision is STRONG\_REVISE. \\
+The tables are cherry-picked. & Full split, full stress, full fixed-risk, row-count, and negative-case ledgers are appended. \\
+Ablations are decorative. & Every named mechanism is removed under the same frozen hard-split protocol. \\
+Fixed-risk results are abstention gaming. & Coverage is reported and abstention counts as zero success. \\
+The literature boundary is too narrow. & The generator filters a local robotics/failure/hierarchy pool and exposes a citation ledger. \\
+The page count is padding. & Appendices are row counts, protocol loads, full results, attack matrix, and reproducibility notes. \\
+It is not ICLR-main ready. & Agreed: no real robot or independent high-fidelity validation exists yet. \\
+\bottomrule
+\end{longtable}
 
-\section{Benchmark}
-The rebuilt benchmark is generated by \texttt{src/run\_experiment.py}. It writes aggregate CSVs and figures directly, so the full run remains lightweight without dropping tasks, regimes, baselines, seeds, ablations, or stress tests.
+\section{Gate Interpretation Notes}
+\paragraph{Success gate.}
+The success gate is intentionally defined against the strongest non-oracle reference rather than a weak behavior-cloning baseline.
 
-\paragraph{Tasks.}
-The tasks are drawer retrieval, peg assembly, mobile manipulation delivery, tool-use sequence, and bimanual handoff.
+\paragraph{Containment gate.}
+Containment is reported separately from success because a method can complete some tasks while still allowing subgoal or task-state corruption.
 
-\paragraph{Failure regimes.}
-The regimes are actuator slip, perception glitch, contact instability, precondition drift, subgoal drift, recovery-budget exhaustion, and cross-level cascading failure.
+\paragraph{Cascade and corruption gates.}
+Cascade, state corruption, and subgoal corruption are separate because a low-level anomaly may not damage the physical scene but can still invalidate future high-level decisions.
 
-\paragraph{Splits.}
-The stress splits are nominal, low-level perturbation, mid-level subgoal shift, delayed escalation, and combined cascade stress.
+\paragraph{False-halt and missed-failure gates.}
+These two metrics expose opposite failure modes. A conservative method can over-halt valid skills; an aggressive method can miss real failures. The paper reports both.
 
-\paragraph{Methods.}
-The baselines are flat behavior cloning, hierarchy without containment, local safety filtering, reactive retry recovery, uncertainty halting, option-termination monitoring, and a failure-aware hierarchical controller. The benchmark also includes the proposed hierarchical containment graph and an oracle containment supervisor.
+\paragraph{Fixed-risk gate.}
+The fixed-risk protocol consumes a predicted containment risk. Coverage is shown so abstention cannot masquerade as safe success.
 
-\paragraph{Metrics.}
-The evidence reports task success, containment rate, state corruption, cascade rate, damage, false halt, recovery success, escalation precision, containment latency, recovery cost, regret to oracle, paired seed differences, ablations, stress sweeps, and failure cases.
+\paragraph{Scope gate.}
+The scope gate is the honesty firewall. Local synthetic evidence can justify a strong-revise artifact, but it cannot establish real robot readiness.
 
-\section{Results}
-\input{../results/combined_stress_table.tex}
-
-The strongest non-oracle baseline is \texttt{failure\_aware\_hierarchical\_controller}. On combined cascade stress, the proposed method improves success by $0.084 \pm 0.009$, wins 7/7 paired seeds, improves containment by $0.121$, lowers state corruption by $0.045$, and lowers damage by $0.022$. The oracle remains substantially better at $0.734 \pm 0.007$, which shows that the benchmark is not saturated.
-
-At maximum stress level $0.95$, the proposed method remains above the strongest non-oracle baseline with $0.581 \pm 0.008$ success versus $0.471 \pm 0.010$, lower state corruption ($0.055$ versus $0.098$), lower cascade rate ($0.120$ versus $0.169$), lower damage ($0.031$ versus $0.054$), and lower containment latency ($0.808$ versus $0.898$). This is still local evidence rather than external validation.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\linewidth]{../figures/hierarchical_containment_combined_success.png}
-\caption{Combined-cascade success with 95\% confidence intervals. The proposed containment graph clears the strongest non-oracle baseline but remains below the oracle.}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\linewidth]{../figures/hierarchical_containment_diagnostics.png}
-\caption{Containment and cascade diagnostics. The proposed method improves the rate of local containment while reducing cross-level cascades.}
-\end{figure}
-
-\input{../results/pairwise_decision_table.tex}
-
-\section{Ablations and stress tests}
-\input{../results/ablation_table.tex}
-
-The best removed-component ablation is \texttt{minus\_false\_halt\_calibration}, which still trails the full graph by $0.032$ success. Removing recovery-budget memory, cross-level escalation, local containment edges, or corruption prediction produces larger drops and different failure signatures. This supports the claim that the method is not just an option-termination heuristic or a conservative safety filter.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\linewidth]{../figures/hierarchical_containment_ablation.png}
-\caption{Ablation success under combined cascade stress. The full graph remains above all removed-component variants.}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\linewidth]{../figures/hierarchical_containment_stress_sweep.png}
-\caption{Stress sweep over cascade intensity. The proposed method remains above non-oracle baselines across the generated stress range, while the oracle remains the ceiling.}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\linewidth]{../figures/hierarchical_containment_damage_regret.png}
-\caption{Damage and regret trade-off on combined cascade stress. The proposed method improves task success while lowering damage relative to the strongest non-oracle baseline.}
-\end{figure}
-
-\section{Where the method still fails}
-The failure-case CSV shows that hierarchical containment helps least when a local retry or option termination can recover before task state is at risk. Those are the intended boundaries. The method's value appears when failures can cross hierarchy levels, recovery budget is limited, or local repair would silently corrupt the high-level task state.
-
-\section{Hostile prior-work boundary}
-Options and Option-Critic already provide hierarchical termination machinery \citep{sutton1999options,bacon2017option}. HIRO already learns efficient hierarchical policies \citep{nachum2018hiro}. Recovery RL and RecoveryChaining already introduce learned recovery policies, including manipulation recovery and physical robot transfer \citep{thananjeyan2020recovery,vats2024recoverychaining}. FailSafe and related VLA recovery work already reason about manipulation failures and executable recovery actions \citep{lin2025failsafe}.
-
-The present paper survives only under a narrower interpretation: it is about \emph{containment boundaries}, not hierarchy, termination, recovery, or safety filtering in general. If real robot experiments later show that option termination, failure-aware hierarchy, recovery RL, or simple uncertainty halting match the proposed method on cascade containment without extra damage or false halts, the claim should be killed.
-
-\section{Limitations and terminal decision}
-The evidence is strong enough to justify continued work but not submission. The limitations are material:
-\begin{itemize}
-\item the benchmark is local and synthetic;
-\item no real robot or independent high-fidelity simulator has been used;
-\item baselines are executable diagnostic models, not external trained robot systems;
-\item no learned policy checkpoint, training curve, or deployment video is provided;
-\item no external benchmark such as LIBERO, RLBench, Meta-World, BridgeData, or a hardware manipulation suite is reported.
-\end{itemize}
-
-The terminal decision for this rebuild is therefore \textbf{STRONG\_REVISE}. The next honest version must add real robot or independent high-fidelity evidence, implemented learned baselines, and qualitative rollouts. Without that evidence, the paper should not be submitted to ICLR main.
-
-\begingroup
-\raggedright
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}
-\endgroup
 
 \end{document}

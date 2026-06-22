@@ -8,11 +8,13 @@ Paper: 105 Hierarchical Failure Containment
 - Option-Critic and HIRO-style methods already learn hierarchical policies.
 - Recovery RL and learned recovery chains already handle failures and safe recovery.
 - Vision-language-action failure-recovery systems already reason about failures in hierarchical task settings.
-- Safety filters and uncertainty halting already reduce damage through conservative intervention.
+- Safety filters, robust fallback controllers, and uncertainty halting already reduce damage through conservative intervention.
 
-## ICLR Main Response
+## v5 Response
 
-The v4 rebuild narrows the novelty boundary to hierarchical containment: stopping or repairing low-level failures before they corrupt higher-level task state. The local benchmark supports that boundary: proposed combined-cascade success is `0.576 +/- 0.007` versus `0.492 +/- 0.006` for the strongest non-oracle baseline, with lower state corruption, cascade, and damage rates.
+The v5 rebuild narrows the novelty boundary to hierarchical containment: deciding the lowest safe level at which to repair, retry, halt, or escalate before a local failure corrupts subgoal or task state. The frozen benchmark includes strong non-oracle hierarchy, recovery, option-termination, robust MPC, POMDP, causal-event, anomaly, safety-filter, retry, v4 containment, and oracle references.
+
+The local evidence supports the boundary. V5 reaches hard-aggregate success `0.83828 +/- 0.00599` versus `0.74167 +/- 0.00595` for the strongest non-oracle baseline. It improves containment from `0.57604` to `0.65243`, lowers cascade from `0.09149` to `0.04175`, and keeps false halt at `0.00582`.
 
 ## Remaining Hostile Review
 
@@ -20,4 +22,4 @@ A hostile reviewer would still be correct to reject a main-track submission toda
 
 ## Honest Action
 
-The paper is marked `STRONG_REVISE`. Continue only if the next version adds real robot or high-fidelity external validation and implemented learned baselines.
+The paper is marked `STRONG_REVISE`. Continue only if the next version adds real robot or high-fidelity external validation, implemented learned baselines, and qualitative rollout evidence.

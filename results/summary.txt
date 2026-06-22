@@ -1,50 +1,105 @@
-Paper 105 hierarchical_failure_containment evidence rebuild
-Design: 5 tasks x 7 failure regimes x 5 splits x 9 methods, 7 seeds, 84 episodes/group.
+Paper 105: hierarchical_failure_containment expanded v5 evidence audit
 Terminal decision: STRONG_REVISE
-Rationale: local hierarchical-failure-containment evidence supports the mechanism, but real robot/external validation is missing
+ICLR main ready: no
+Design: 6 tasks x 8 failure regimes x 8 splits x 15 methods, 10 seeds, 6 episodes per seed/task/regime/split/method cell.
+Claim under test: risk-calibrated hierarchical containment should prevent low-level failures from corrupting subgoals or high-level task state under hostile cascade, budget, delay, and false-halt stress.
 
-Combined-cascade ranking:
-oracle_containment_supervisor: success=0.734 +/- 0.007, contain=0.629, corrupt=0.012, cascade=0.071, damage=0.006, false_halt=0.163, recovery=0.453, escalation_precision=0.620, latency=0.692, regret=0.000
-proposed_hierarchical_failure_containment_graph: success=0.576 +/- 0.007, contain=0.515, corrupt=0.053, cascade=0.116, damage=0.029, false_halt=0.166, recovery=0.380, escalation_precision=0.505, latency=0.783, regret=0.159
-failure_aware_hierarchical_controller: success=0.492 +/- 0.006, contain=0.394, corrupt=0.098, cascade=0.158, damage=0.050, false_halt=0.179, recovery=0.327, escalation_precision=0.408, latency=0.870, regret=0.242
-option_termination_monitor: success=0.442 +/- 0.008, contain=0.338, corrupt=0.116, cascade=0.179, damage=0.063, false_halt=0.189, recovery=0.286, escalation_precision=0.361, latency=0.907, regret=0.292
-uncertainty_halt_policy: success=0.389 +/- 0.007, contain=0.290, corrupt=0.143, cascade=0.197, damage=0.071, false_halt=0.214, recovery=0.235, escalation_precision=0.312, latency=0.951, regret=0.346
-reactive_retry_recovery: success=0.382 +/- 0.007, contain=0.269, corrupt=0.146, cascade=0.213, damage=0.071, false_halt=0.188, recovery=0.266, escalation_precision=0.269, latency=0.967, regret=0.353
-local_safety_filter: success=0.349 +/- 0.008, contain=0.275, corrupt=0.156, cascade=0.221, damage=0.082, false_halt=0.233, recovery=0.213, escalation_precision=0.239, latency=0.960, regret=0.385
-hierarchy_without_containment: success=0.306 +/- 0.008, contain=0.177, corrupt=0.179, cascade=0.255, damage=0.096, false_halt=0.175, recovery=0.173, escalation_precision=0.182, latency=1.039, regret=0.429
-flat_behavior_clone: success=0.232 +/- 0.006, contain=0.113, corrupt=0.207, cascade=0.264, damage=0.106, false_halt=0.176, recovery=0.127, escalation_precision=0.142, latency=1.089, regret=0.503
+Row counts:
+- ablation_metric_rows: 10
+- ablation_rollout_rows: 115200
+- ablation_seed_rows: 100
+- dataset_summary_rows: 3840
+- failure_case_rows: 24
+- fixed_risk_metric_rows: 48
+- fixed_risk_pairwise_rows: 44
+- fixed_risk_rows: 276480
+- fixed_risk_seed_rows: 480
+- hard_metric_rows: 15
+- hard_pairwise_rows: 14
+- hard_seed_rows: 150
+- main_group_rows: 57600
+- main_metric_rows: 120
+- main_rollout_rows: 345600
+- main_seed_metric_rows: 150
+- stress_metric_rows: 100
+- stress_rollout_rows: 288000
+- stress_seed_rows: 1000
+
+Hard-aggregate evidence:
+- oracle_containment_supervisor: success=0.91510 +/- 0.00450, containment=0.70391, cascade=0.01823, state_corruption=0.00174, subgoal_corruption=0.00269, damage=0.00269, false_halt=0.00208, missed_failure=0.10729, recovery=0.57422, escalation_precision=0.79054, latency=0.48180, ece=0.00317, regret=0.00000, utility=0.91913
+- risk_calibrated_hierarchical_containment_v5: success=0.83828 +/- 0.00599, containment=0.65243, cascade=0.04175, state_corruption=0.00217, subgoal_corruption=0.00182, damage=0.00182, false_halt=0.00582, missed_failure=0.14332, recovery=0.54158, escalation_precision=0.73203, latency=0.53093, ece=0.00328, regret=0.11311, utility=0.79005
+- proposed_hierarchical_failure_containment_graph_v4: success=0.74167 +/- 0.00595, containment=0.57604, cascade=0.09149, state_corruption=0.02205, subgoal_corruption=0.02865, damage=0.00408, false_halt=0.03030, missed_failure=0.21858, recovery=0.47014, escalation_precision=0.62917, latency=0.61056, ece=0.02492, regret=0.19288, utility=0.56205
+- causal_event_graph_containment: success=0.68168 +/- 0.00507, containment=0.49583, cascade=0.12231, state_corruption=0.04722, subgoal_corruption=0.04931, damage=0.02049, false_halt=0.03767, missed_failure=0.26927, recovery=0.41042, escalation_precision=0.58750, latency=0.68023, ece=0.03472, regret=0.24965, utility=0.38718
+- recovery_budgeted_controller: success=0.66849 +/- 0.01029, containment=0.45851, cascade=0.13316, state_corruption=0.06432, subgoal_corruption=0.07075, damage=0.02439, false_halt=0.03802, missed_failure=0.28238, recovery=0.42587, escalation_precision=0.54670, latency=0.69158, ece=0.03763, regret=0.25903, utility=0.33250
+- hierarchical_pomdp_monitor: success=0.65260 +/- 0.00731, containment=0.46493, cascade=0.13620, state_corruption=0.05781, subgoal_corruption=0.06259, damage=0.02865, false_halt=0.04375, missed_failure=0.28168, recovery=0.39618, escalation_precision=0.55703, latency=0.70235, ece=0.04028, regret=0.27448, utility=0.31064
+- failure_aware_hierarchical_controller: success=0.63481 +/- 0.00860, containment=0.44957, cascade=0.15469, state_corruption=0.07569, subgoal_corruption=0.07500, damage=0.03689, false_halt=0.06354, missed_failure=0.30208, recovery=0.37726, escalation_precision=0.53576, latency=0.71789, ece=0.06119, regret=0.29106, utility=0.23459
+- robust_mpc_fallback: success=0.62830 +/- 0.00642, containment=0.43967, cascade=0.16476, state_corruption=0.07839, subgoal_corruption=0.09080, damage=0.04523, false_halt=0.05304, missed_failure=0.30477, recovery=0.38047, escalation_precision=0.48368, latency=0.72104, ece=0.05112, regret=0.29818, utility=0.20211
+- anomaly_transformer_attribution: success=0.62057 +/- 0.01061, containment=0.45321, cascade=0.15608, state_corruption=0.07309, subgoal_corruption=0.08090, damage=0.03793, false_halt=0.06840, missed_failure=0.30417, recovery=0.36727, escalation_precision=0.52005, latency=0.71989, ece=0.06883, regret=0.30477, utility=0.21012
+- option_termination_monitor: success=0.59097 +/- 0.00779, containment=0.39965, cascade=0.19175, state_corruption=0.10130, subgoal_corruption=0.11155, damage=0.05868, false_halt=0.06927, missed_failure=0.34601, recovery=0.33186, escalation_precision=0.46884, latency=0.76419, ece=0.07464, regret=0.33255, utility=0.07324
+- uncertainty_halt_policy: success=0.52344 +/- 0.01025, containment=0.32847, cascade=0.22917, state_corruption=0.13003, subgoal_corruption=0.13845, damage=0.07708, false_halt=0.06936, missed_failure=0.39549, recovery=0.28533, escalation_precision=0.39245, latency=0.82453, ece=0.06365, regret=0.39531, utility=-0.11351
+- reactive_retry_recovery: success=0.50903 +/- 0.01076, containment=0.29418, cascade=0.23438, state_corruption=0.13455, subgoal_corruption=0.14913, damage=0.07578, false_halt=0.08333, missed_failure=0.40469, recovery=0.32023, escalation_precision=0.34939, latency=0.82567, ece=0.10694, regret=0.40972, utility=-0.14910
+- local_safety_filter: success=0.48915 +/- 0.00803, containment=0.30556, cascade=0.24384, state_corruption=0.15964, subgoal_corruption=0.16649, damage=0.09280, false_halt=0.09479, missed_failure=0.41988, recovery=0.25365, escalation_precision=0.29983, latency=0.84458, ece=0.10345, regret=0.42882, utility=-0.23519
+- hierarchy_without_containment: success=0.41007 +/- 0.00855, containment=0.18906, cascade=0.28967, state_corruption=0.18438, subgoal_corruption=0.20920, damage=0.12431, false_halt=0.09609, missed_failure=0.49722, recovery=0.18307, escalation_precision=0.22205, latency=0.94702, ece=0.14010, regret=0.50651, utility=-0.47264
+- flat_behavior_clone: success=0.33689 +/- 0.00737, containment=0.12083, cascade=0.32873, state_corruption=0.21259, subgoal_corruption=0.22700, damage=0.14783, false_halt=0.10408, missed_failure=0.54644, recovery=0.13394, escalation_precision=0.17700, latency=1.00622, ece=0.15669, regret=0.57908, utility=-0.66443
+
+Reference winners:
+- best_success_reference=proposed_hierarchical_failure_containment_graph_v4
+- best_utility_reference=proposed_hierarchical_failure_containment_graph_v4
+- best_containment_reference=proposed_hierarchical_failure_containment_graph_v4
+- best_removed_success_ablation=no_false_halt_calibration
+- best_removed_utility_ablation=no_risk_calibration
+- max_stress_reference=proposed_hierarchical_failure_containment_graph_v4
+- fixed_risk_reference=proposed_hierarchical_failure_containment_graph_v4
+- v5_success=0.83828
+- v5_containment_rate=0.65243
+- v5_cascade_rate=0.04175
+- v5_state_corruption=0.00217
+- v5_subgoal_corruption=0.00182
+- v5_damage_rate=0.00182
+- v5_false_halt=0.00582
+- v5_missed_failure=0.14332
+- v5_recovery_success=0.54158
+- v5_escalation_precision=0.73203
+- v5_containment_latency=0.53093
+- v5_ece=0.00328
+- v5_regret=0.11311
+- v5_utility=0.79005
+- oracle_success=0.91510
 
 Gate outcomes:
-success_gate: True
-diagnostic_gate: True
-safety_gate: True
-pairwise_gate: True
-ablation_gate: True
-success_margin_vs_strongest: 0.08396501457725947
-containment_delta_vs_strongest: 0.12060252672497573
-cascade_delta_vs_strongest: -0.04217687074829937
-damage_delta_vs_strongest: -0.02157434402332362
-state_corruption_delta_vs_strongest: -0.045432458697764834
-false_halt_delta_vs_strongest: -0.012196307094266251
-ablation_margin_vs_best_removed_component: 0.0321185617103984
-strongest_non_oracle_baseline: failure_aware_hierarchical_controller
-best_removed_component: minus_false_halt_calibration
+- success_gate: True
+- containment_gate: True
+- cascade_gate: True
+- state_corruption_gate: True
+- subgoal_corruption_gate: True
+- damage_gate: True
+- false_halt_gate: True
+- missed_failure_gate: True
+- calibration_gate: True
+- utility_gate: True
+- pairwise_gate: True
+- ablation_gate: True
+- stress_gate: True
+- fixed_risk_gate: True
+- scope_gate: False
 
-Pairwise proposed comparisons:
-failure_aware_hierarchical_controller: diff=0.084 +/- 0.009, wins=7/7, decision=proposed_better
-flat_behavior_clone: diff=0.345 +/- 0.011, wins=7/7, decision=proposed_better
-hierarchy_without_containment: diff=0.271 +/- 0.008, wins=7/7, decision=proposed_better
-local_safety_filter: diff=0.227 +/- 0.013, wins=7/7, decision=proposed_better
-option_termination_monitor: diff=0.134 +/- 0.005, wins=7/7, decision=proposed_better
-oracle_containment_supervisor: diff=-0.158 +/- 0.010, wins=0/7, decision=not_decisive
-reactive_retry_recovery: diff=0.195 +/- 0.010, wins=7/7, decision=proposed_better
-uncertainty_halt_policy: diff=0.188 +/- 0.014, wins=7/7, decision=proposed_better
+Terminal rationale:
+- all frozen local empirical gates pass; terminal state remains STRONG_REVISE only because scope/external-validation evidence is missing
+- scope gate fails because no real robot study, accepted high-fidelity benchmark, external hierarchical-failure logs, trained checkpoint, or rollout videos exist
 
-Ablations:
-full_hierarchical_failure_containment_graph: success=0.583 +/- 0.008, contain=0.517, cascade=0.115, damage=0.028, note=all components
-minus_false_halt_calibration: success=0.551 +/- 0.011, contain=0.494, cascade=0.122, damage=0.033, note=contains failures but over-halts valid skills
-minus_recovery_budget_memory: success=0.509 +/- 0.007, contain=0.459, cascade=0.142, damage=0.044, note=forgets remaining recovery budget
-minus_cross_level_escalation_model: success=0.502 +/- 0.008, contain=0.433, cascade=0.160, damage=0.051, note=does not decide when to escalate across hierarchy levels
-minus_local_containment_edges: success=0.501 +/- 0.004, contain=0.378, cascade=0.154, damage=0.037, note=removes skill-local containment edges
-minus_task_state_corruption_predictor: success=0.496 +/- 0.008, contain=0.476, cascade=0.135, damage=0.054, note=removes high-level task-state corruption predictor
-flat_reactive_recovery_only: success=0.377 +/- 0.005, contain=0.269, cascade=0.211, damage=0.072, note=flat retry recovery baseline
+Ablation summary:
+- full_risk_calibrated_hierarchical_containment_v5: success=0.84045, containment=0.65321, cascade=0.04714, false_halt=0.00564, utility=0.78665, note=all components
+- no_false_halt_calibration: success=0.78559, containment=0.61918, cascade=0.05712, false_halt=0.09201, utility=0.65811, note=over-halts valid skills
+- no_risk_calibration: success=0.78550, containment=0.60156, cascade=0.06363, false_halt=0.03264, utility=0.66445, note=removes calibrated deployment risk
+- no_escalation_utility_model: success=0.76345, containment=0.60460, cascade=0.07153, false_halt=0.01944, utility=0.63601, note=does not price local repair versus escalation
+- no_delayed_observation_buffer: success=0.75903, containment=0.58898, cascade=0.07222, false_halt=0.00937, utility=0.62374, note=drops delayed failure observations
+- no_recovery_budget_memory: success=0.75304, containment=0.60625, cascade=0.10052, false_halt=0.00764, utility=0.61547, note=forgets remaining recovery budget
+- v4_containment_graph_rules: success=0.74635, containment=0.56371, cascade=0.09332, false_halt=0.02934, utility=0.56806, note=prior v4 rule proxy
+- no_local_containment_graph: success=0.72838, containment=0.45330, cascade=0.09783, false_halt=0.00625, utility=0.50939, note=removes skill-local containment edges
+- no_corruption_predictor: success=0.72613, containment=0.55729, cascade=0.09323, false_halt=0.01580, utility=0.51614, note=removes state/subgoal corruption predictor
+- no_cross_level_escalation_model: success=0.71050, containment=0.54063, cascade=0.13507, false_halt=0.00981, utility=0.45402, note=removes cross-level escalation model
+
+Fixed-risk strict v5: coverage=1.00000, success=0.83854, containment=0.65347, cascade=0.04010, damage=0.00260, false_halt=0.00313, missed_failure=0.14392, utility=0.79059
+
+No human-subject, hardware, or external high-fidelity validation is claimed; this is a local CPU-only executable surrogate audit.
+terminal=STRONG_REVISE
